@@ -1,9 +1,9 @@
 //=============================================================================
-// JSONFrameAnimations.js
+// KurtsAnimationPlugin.js
 //=============================================================================
 /*:
  * @plugindesc v1.0.0 Allows different number of frames for each character animation using JSON frame data
- * @author Your Name
+ * @author Furkan Kurt
  * 
  * @param Idle Up Speed
  * @text Idle Up Animation Speed
@@ -116,7 +116,7 @@
     'use strict';
 
     // Read plugin parameters
-    const parameters = PluginManager.parameters('JSONFrameAnimations');
+    const parameters = PluginManager.parameters('KurtsAnimationPlugin');
     
     // Run speed threshold (move speed >= this value is considered running)
     const RUN_SPEED_THRESHOLD = Number(parameters['Run Speed Threshold']) || 5;
