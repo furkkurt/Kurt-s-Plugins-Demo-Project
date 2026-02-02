@@ -1,12 +1,14 @@
 # RPG Maker MZ Plugins by Furkan Kurt
 
-A collection of three plugins for RPG Maker MZ that enhance character animations, add perspective effects, and provide customizable keyboard controls.
+A collection of five plugins for RPG Maker MZ that enhance character animations, add perspective effects, provide customizable keyboard controls, expand event interaction areas, and add sprite shake effects.
 
 ## 📋 Table of Contents
 
 - [KurtsAnimationPlugin](#kurtsanimationplugin)
 - [KurtsPerpectivePlugin](#kurtsperspectiveplugin)
 - [KurtsKeyMapper](#kurtskeymapper)
+- [KurtsInteractionRangePlugin](#kurtsinteractionrangeplugin)
+- [KurtsShakePlugin](#kurtsshakeplugin)
 - [Installation](#installation)
 - [Compatibility](#compatibility)
 
@@ -203,12 +205,180 @@ Choose movement key layout
 
 ---
 
+## KurtsInteractionRangePlugin
+
+**Version:** 1.0.0
+
+Expands the interaction area of events using a high-performance range-checking system. No event cloning - just smart interaction detection that scales to hundreds of events without performance issues.
+
+### Features
+
+- ✅ Expand interaction area in all directions (square grid)
+- ✅ No visual duplication (single event sprite)
+- ✅ High performance - O(1) per event check
+- ✅ Scales to hundreds of events without lag
+- ✅ Works with all event trigger types
+- ✅ Simple note tag configuration
+- ✅ Configurable default range via plugin manager
+- ✅ Debug logging for troubleshooting
+- ✅ No memory overhead - no clones created
+- ✅ Safe for save/load
+- ✅ Backward compatible (events without tag work normally)
+
+### Plugin Parameters
+
+#### Default Range
+- **Default:** 4
+- **Range:** 0-20
+- Default interaction range for events that don't have a note tag
+- Set to 0 to disable default (only events with note tags will have expanded range)
+
+#### Enable Debug
+- **Default:** true
+- Enable console logging for debugging
+- Turn OFF in production to reduce console spam
+
+### Usage
+
+1. **Add the note tag to your event (optional):**
+   In the event's Note box, add:
+   ```
+   <interactionRange:4>
+   ```
+   If no note tag is specified, the Default Range parameter will be used.
+
+2. **Set the interaction range:**
+   The number represents tiles in each direction:
+   - `4` = 4 tiles left, right, up, and down (9x9 area total)
+   - `2` = 2 tiles in each direction (5x5 area total)
+   - `8` = 8 tiles in each direction (17x17 area total)
+
+3. **Configure event trigger:**
+   Works with all trigger types:
+   - **Action Button** (0) - Press action key when facing the event
+   - **Player Touch** (1) - Player walks into the event
+   - **Event Touch** (2) - Event touches the player
+
+### Examples
+
+**Small interaction zone:**
+```
+<interactionRange:2>
+```
+Creates a 5x5 tile interaction area.
+
+**Medium interaction zone:**
+```
+<interactionRange:4>
+```
+Creates a 9x9 tile interaction area (as shown in your screenshot).
+
+**Large interaction zone:**
+```
+<interactionRange:8>
+```
+Creates a 17x17 tile interaction area.
+
+### How It Works
+
+- Uses a high-performance range-checking system that runs only when interaction is checked
+- Checks if the player is within the specified range of any event with the `interactionRange` tag
+- Uses Manhattan distance (square grid) - checks both X and Y distance
+- No event cloning - expands interaction logic, not the map
+- Only one event image is displayed (no duplication)
+- The event logic runs once when triggered (no duplication)
+- Industry-standard approach used by professional RPG Maker developers
+
+### Debugging
+
+When debug logging is enabled, the plugin will log:
+- Total events on the map
+- Events with interaction range configured
+- Events currently in range of the player
+- Events that were triggered
+- Event positions and distances
+
+Open the browser console (F8) to see debug information.
+
+### Tips
+
+- Use larger ranges for important NPCs or objects that should be easy to interact with
+- Combine with different trigger types for different interaction styles
+- Events without the tag will use the Default Range parameter (if set)
+- The range is checked from the event's position, not the player's
+- Turn off debug logging in production for better performance
+
+---
+
+## KurtsShakePlugin
+
+**Version:** 1.0.0
+
+Adds a sprite shake effect for the player character. Shakes only the player sprite, not the camera, creating a localized visual effect perfect for impacts, hits, or dramatic moments.
+
+### Features
+
+- ✅ Player sprite shake only (no camera shake)
+- ✅ Configurable power, speed, and duration
+- ✅ Smooth sine wave-based shake animation
+- ✅ Easy to call from event scripts
+- ✅ Lightweight and performant
+
+### Usage
+
+Call from an event script:
+
+```javascript
+$gamePlayer.startShake(power, speed, duration);
+```
+
+**Parameters:**
+- `power` - Shake intensity (higher = more shake)
+- `speed` - Shake speed (higher = faster shake)
+- `duration` - Number of frames the shake lasts
+
+### Examples
+
+**Light shake:**
+```javascript
+$gamePlayer.startShake(2, 5, 15);
+```
+
+**Medium shake:**
+```javascript
+$gamePlayer.startShake(4, 10, 20);
+```
+
+**Strong shake:**
+```javascript
+$gamePlayer.startShake(8, 15, 30);
+```
+
+### Use Cases
+
+- Character taking damage
+- Impact effects
+- Dramatic moments
+- Environmental effects (earthquake, explosion nearby)
+- Status effects (poison, confusion)
+
+### Tips
+
+- Lower power values (2-4) work well for subtle effects
+- Higher power values (6-10) create dramatic shake effects
+- Speed controls how fast the shake oscillates
+- Duration is in frames (60 frames = 1 second at 60 FPS)
+
+---
+
 ## Installation
 
 1. Copy the plugin files to your project's `js/plugins/` folder:
    - `KurtsAnimationPlugin.js`
    - `KurtsPerpectivePlugin.js`
    - `KurtsKeyMapper.js`
+   - `KurtsInteractionRangePlugin.js`
+   - `KurtsShakePlugin.js`
 
 2. Open RPG Maker MZ
 
@@ -228,7 +398,9 @@ Your Project/
 │   └── plugins/
 │       ├── KurtsAnimationPlugin.js
 │       ├── KurtsPerpectivePlugin.js
-│       └── KurtsKeyMapper.js
+│       ├── KurtsKeyMapper.js
+│       ├── KurtsInteractionRangePlugin.js
+│       └── KurtsShakePlugin.js
 └── img/
     └── characters/
         ├── $clem.png
@@ -249,6 +421,8 @@ For best results, load plugins in this order:
 1. KurtsAnimationPlugin
 2. KurtsPerpectivePlugin
 3. KurtsKeyMapper
+4. KurtsInteractionRangePlugin
+5. KurtsShakePlugin
 
 ---
 
@@ -286,6 +460,21 @@ If you encounter any issues or have questions:
 - Initial release
 - Customizable action button
 - WASD movement support
+
+### KurtsInteractionRangePlugin v1.0.0
+- Initial release
+- High-performance range-checking system (no cloning)
+- Expanded interaction areas via note tags
+- Configurable default range via plugin manager
+- Debug logging for troubleshooting
+- Support for all event trigger types
+- Scales to hundreds of events without performance issues
+
+### KurtsShakePlugin v1.0.0
+- Initial release
+- Player sprite shake effect
+- Configurable power, speed, and duration
+- Sine wave-based smooth animation
 
 ---
 

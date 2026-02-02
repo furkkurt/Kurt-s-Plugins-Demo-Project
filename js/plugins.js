@@ -4,5 +4,7 @@ var $plugins =
 [
 {"name":"KurtsAnimationPlugin","status":true,"description":"v1.0.0 Allows different number of frames for each character animation using JSON frame data","parameters":{"Idle Up Speed":"f * 0.5","Idle Down Speed":"f * 0.5","Idle Left Speed":"f * 0.5","Idle Right Speed":"f * 0.5","Walk Up Speed":"f * 0.6","Walk Down Speed":"f * 0.6","Walk Left Speed":"f * 0.6","Walk Right Speed":"f * 0.6","Run Up Speed":"f * 0.8","Run Down Speed":"f * 0.8","Run Left Speed":"f * 0.8","Run Right Speed":"f * 0.8","Run Speed Threshold":"6"}},
 {"name":"KurtsPerpectivePlugin","status":true,"description":"v1.0.0 Adds 2.5D perspective effect by scaling characters based on Y position","parameters":{"Min Scale":"0.88","Max Scale":"1.03","Control Point Y":"60.0","Control Point Scale":"0.88","Use Screen Based":"false"}},
-{"name":"KurtsKeyMapper","status":true,"description":"v1.0.0 Customizable keyboard controls for action and movement","parameters":{"Action Button":"e","Movement Keys":"wasd"}}
+{"name":"KurtsKeyMapper","status":true,"description":"v1.0.0 Customizable keyboard controls for action and movement","parameters":{"Action Button":"e","Movement Keys":"wasd"}},
+{"name":"KurtsInteractionRangePlugin","status":true,"description":"v1.0.0 Expands event interaction area without duplicating visuals","parameters":{"Default Range":"4","Enable Debug":"true"}},
+{"name":"KurtsShakePlugin","status":true,"description":"v1.0.0 Shake the player sprite only (no camera shake)","parameters":{}}
 ];
