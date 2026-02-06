@@ -8,5 +8,5 @@ var $plugins =
 {"name":"KurtsInteractionRangePlugin","status":true,"description":"v2.1.0 Expands event interaction area with directional ranges","parameters":{"Enable Debug":"true","Icon Image":"interact","Icon Offset Y":"20","Interaction Origin %":"40"}},
 {"name":"KurtsShakePlugin","status":true,"description":"v1.0.0 Shake the player sprite only (no camera shake)","parameters":{}},
 {"name":"KurtsMouseWheelZoom","status":true,"description":"v1.0.0 Mouse wheel zoom in/out for map camera","parameters":{"Min Zoom":"0.50","Max Zoom":"3.00","Zoom Step":"0.10","Smoothness":"0.20","Disable During Events":"true"}},
-{"name":"KurtsCameraLag","status":true,"description":"v1.0.0 Adds smooth camera lag/easing when following the player","parameters":{"Lag Strength":"0.03","Horizontal Lag":"0.03","Vertical Lag":"0.03"}}
+{"name":"KurtsCameraLag","status":true,"description":"v1.0.0 Adds smooth camera lag/easing when following the player","parameters":{"Lag Strength":"0.06","Horizontal Lag":"0.06","Vertical Lag":"0.06","Center Zoom Threshold":"1.40","Player Y Offset":"100","Transition Lag":"0.03"}}
 ];

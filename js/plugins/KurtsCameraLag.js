@@ -32,6 +32,32 @@
  * @decimals 2
  * @default 0
  *
+ * @param Center Zoom Threshold
+ * @text Center Zoom Threshold
+ * @desc When zoom is at or below this value, camera freezes and centers map. Above this, camera follows player with lag. (1.2 = default, lower = more zoomed out before freezing)
+ * @type number
+ * @min 0.5
+ * @max 2.0
+ * @decimals 2
+ * @default 1.2
+ *
+ * @param Player Y Offset
+ * @text Player Y Offset
+ * @desc Vertical offset for player centering in pixels. Use same value as KurtsInteractionRangePlugin for consistency. Negative = up, Positive = down.
+ * @type number
+ * @min -100
+ * @max 100
+ * @default 0
+ *
+ * @param Transition Lag
+ * @text Mode Transition Lag
+ * @desc How fast the camera transitions when switching between zoomed-in (follow) and zoomed-out (static) modes. Lower = slower/smoother.
+ * @type number
+ * @min 0.01
+ * @max 1.0
+ * @decimals 2
+ * @default 0.08
+ *
  * @help
  * ============================================================================
  * Kurts Camera Lag Plugin
@@ -73,6 +99,22 @@
  * - Horizontal Lag: 0.20, Vertical Lag: 0.12
  *   → Camera lags more on horizontal movement (good for side-scrolling)
  *
+ * ZOOM THRESHOLD MODE SWITCHING:
+ * --------------------------------
+ * The plugin automatically switches between two modes based on zoom level:
+ *
+ * MODE A - ZOOMED IN (above threshold):
+ * - Camera follows player with smooth lag
+ * - Background/parallax moves with camera
+ * - Normal gameplay mode
+ *
+ * MODE B - ZOOMED OUT (at or below threshold):
+ * - Camera is completely frozen
+ * - Map is statically centered
+ * - Player moves inside the frame
+ * - Background/parallax is completely static
+ * - Overview/exploration mode
+ *
  * NOTES:
  * ------
  * - Camera lag works with zoom, parallax, and all camera features
@@ -81,6 +123,7 @@
  * - Compatible with KurtsMouseWheelZoom plugin
  * - Works with all event triggers and interaction ranges
  * - Smooth interpolation prevents jittery camera movement
+ * - Zoom threshold prevents camera drift when zoomed out
  *
  * ============================================================================
  */
@@ -92,6 +135,9 @@
     const LAG_STRENGTH = Number(parameters['Lag Strength'] || 0.15);
     const LAG_HORIZONTAL = Number(parameters['Horizontal Lag'] || 0);
     const LAG_VERTICAL = Number(parameters['Vertical Lag'] || 0);
+    const CENTER_ZOOM_THRESHOLD = Number(parameters['Center Zoom Threshold'] || 1.2);
+    const PLAYER_Y_OFFSET = Number(parameters['Player Y Offset'] || 0);
+    const TRANSITION_LAG = Number(parameters['Transition Lag'] || 0.08);
 
     // Use separate lag values if provided, otherwise use main lag strength
     const LAG_X = LAG_HORIZONTAL > 0 ? LAG_HORIZONTAL : LAG_STRENGTH;
@@ -100,6 +146,22 @@
     // Store smooth camera position (null = not initialized)
     let camX = null;
     let camY = null;
+
+    // Track previous mode for transition detection
+    let previousMode = null; // 'follow' or 'static'
+
+    // Override Game_Map.setDisplayPos to remove clamping
+    // This allows camera to show outside map bounds, keeping player centered
+    const _Game_Map_setDisplayPos = Game_Map.prototype.setDisplayPos;
+    Game_Map.prototype.setDisplayPos = function(x, y) {
+        // Remove all clamping - allow camera to move freely
+        // This enables player to stay centered even at map edges
+        this._displayX = x;
+        this._displayY = y;
+        // Update parallax to match (needed for proper rendering)
+        this._parallaxX = x;
+        this._parallaxY = y;
+    };
 
     // Override Game_Player.updateScroll to prevent direct camera modification
     // The vanilla function calls scroll functions which directly set _displayX/Y
@@ -131,56 +193,79 @@
         const tw = this.tileWidth();
         const th = this.tileHeight();
 
-        // Visible size WITHOUT zoom (important!)
-        // _displayX/Y must stay in map tile space, zoom only affects rendering
+        // Screen size in tiles (UNSCALED - displayX/Y work in unscaled space)
         const viewW = Graphics.width / tw;
         const viewH = Graphics.height / th;
 
-        // Always follow player in map space
-        // Camera should always be centered on player, zoom only changes visible area
-        const targetX = $gamePlayer._realX - viewW / 2 + 0.5;
-        const targetY = $gamePlayer._realY - viewH / 2 + 0.5;
+        // Get current zoom level
+        const zoom = $gameScreen.zoomScale();
 
-        // Initialize camera position on first frame
+        // Determine current mode
+        const currentMode = (zoom <= CENTER_ZOOM_THRESHOLD) ? 'static' : 'follow';
+
+        // Detect if we're transitioning between modes
+        const isTransitioning = (previousMode !== null && previousMode !== currentMode);
+
+        // Calculate target position based on mode
+        let targetX, targetY;
+
+        if (currentMode === 'static') {
+            // ============================
+            // MODE B: ZOOMED OUT (STATIC)
+            // ============================
+            const mapW = this.width();
+            const mapH = this.height();
+
+            // Target: center map on screen
+            targetX = (mapW - viewW) / 2;
+            targetY = (mapH - viewH) / 2;
+        } else {
+            // ============================
+            // MODE A: ZOOMED IN (LAG FOLLOW)
+            // ============================
+            // Player's world position (tile coordinates)
+            const playerX = $gamePlayer._realX + 0.5;
+            const playerY = $gamePlayer._realY + 0.5 - (PLAYER_Y_OFFSET / th);
+
+            // Target: center player on screen
+            targetX = playerX - viewW / 2;
+            targetY = playerY - viewH / 2;
+        }
+
+        // Update previous mode for next frame
+        previousMode = currentMode;
+
+        // Initialize camera position on first frame (use current display position)
         if (camX === null) {
-            camX = targetX;
+            camX = this._displayX;
         }
         if (camY === null) {
+            camY = this._displayY;
+        }
+
+        // Choose lag value based on mode:
+        // - Follow mode (zoomed in): use normal LAG_X/LAG_Y for responsive player following
+        // - Static mode (zoomed out): use TRANSITION_LAG for smooth centering
+        const lagX = (currentMode === 'follow') ? LAG_X : TRANSITION_LAG;
+        const lagY = (currentMode === 'follow') ? LAG_Y : TRANSITION_LAG;
+
+        // Smooth interpolation (linear interpolation / lerp)
+        camX += (targetX - camX) * lagX;
+        camY += (targetY - camY) * lagY;
+
+        // Snap to target when very close to prevent endless micro-adjustments
+        const SNAP_THRESHOLD = 0.0001;
+        if (Math.abs(camX - targetX) < SNAP_THRESHOLD) {
+            camX = targetX;
+        }
+        if (Math.abs(camY - targetY) < SNAP_THRESHOLD) {
             camY = targetY;
         }
 
-        // Smooth interpolation (linear interpolation / lerp)
-        // This creates the lag/easing effect
-        camX += (targetX - camX) * LAG_X;
-        camY += (targetY - camY) * LAG_Y;
-
-        // Clamp camera position to map bounds
-        // Only center if map is smaller than screen (can't scroll)
-        // Otherwise always follow player
-        const mapW = this.width();
-        const mapH = this.height();
-
-        // Calculate max camera position (how far camera can scroll)
-        const maxX = Math.max(0, mapW - viewW);
-        const maxY = Math.max(0, mapH - viewH);
-
-        // Horizontal: Only center if we can't scroll (map smaller than screen)
-        if (maxX <= 0) {
-            // Map is smaller than screen - center it horizontally
-            this._displayX = (mapW - viewW) / 2;
-        } else {
-            // Map is larger than screen - always follow player with clamping
-            this._displayX = Math.max(0, Math.min(camX, maxX));
-        }
-
-        // Vertical: Only center if we can't scroll (map smaller than screen)
-        if (maxY <= 0) {
-            // Map is smaller than screen - center it vertically
-            this._displayY = (mapH - viewH) / 2;
-        } else {
-            // Map is larger than screen - always follow player with clamping
-            this._displayY = Math.max(0, Math.min(camY, maxY));
-        }
+        // Snap camera to whole pixels to prevent sub-pixel jitter/trembling
+        // Convert tile-space to pixel-aligned values, then back to tiles
+        this._displayX = Math.round(camX * tw) / tw;
+        this._displayY = Math.round(camY * th) / th;
     };
 
     // Reset camera position when map changes
@@ -190,6 +275,7 @@
         // Reset smooth camera position when entering a new map
         camX = null;
         camY = null;
+        previousMode = null;
     };
 
 })();

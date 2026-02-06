@@ -178,9 +178,10 @@
         // SMOOTHNESS: 0.1 = very smooth/slow, 0.5 = fast/snappy
         const newZoom = currentZoom + (targetZoom - currentZoom) * SMOOTHNESS;
 
-        // Center zoom on player's screen position
-        const zoomX = $gamePlayer ? $gamePlayer.screenX() : Graphics.width / 2;
-        const zoomY = $gamePlayer ? $gamePlayer.screenY() : Graphics.height / 2;
+        // Center zoom on screen center (not player position)
+        // Camera plugin controls position, zoom plugin only controls scale
+        const zoomX = Graphics.width / 2;
+        const zoomY = Graphics.height / 2;
 
         // Apply zoom using Game_Screen.setZoom (this ensures proper rendering)
         $gameScreen.setZoom(zoomX, zoomY, newZoom);
