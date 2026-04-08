@@ -1,480 +1,233 @@
-# RPG Maker MZ Plugins by Furkan Kurt
+# RPG Maker MZ — Kurts plugin suite
 
-A collection of five plugins for RPG Maker MZ that enhance character animations, add perspective effects, provide customizable keyboard controls, expand event interaction areas, and add sprite shake effects.
-
-## 📋 Table of Contents
-
-- [KurtsAnimationPlugin](#kurtsanimationplugin)
-- [KurtsPerpectivePlugin](#kurtsperspectiveplugin)
-- [KurtsKeyMapper](#kurtskeymapper)
-- [KurtsInteractionRangePlugin](#kurtsinteractionrangeplugin)
-- [KurtsShakePlugin](#kurtsshakeplugin)
-- [Installation](#installation)
-- [Compatibility](#compatibility)
+Custom plugins and conventions for this project: resolution-aware UI, camera, cutscenes, interaction, animation, and options.  
+**Author:** Furkan Kurt
 
 ---
 
-## KurtsAnimationPlugin
+## Table of contents
 
-**Version:** 1.0.0
-
-Allows you to use different numbers of frames for each character animation by reading frame data from JSON files exported by LibreSprite.
-
-### Features
-
-- ✅ Variable frame counts for each animation (idle, walk, run in 4 directions)
-- ✅ Supports up to 12 different animation sequences per character
-- ✅ Individual speed modifiers for each animation type
-- ✅ Automatic fallback to first frame if animation is missing
-- ✅ Configurable run speed threshold
-- ✅ Smooth animation transitions
-
-### Usage
-
-1. **Prepare your character sprites:**
-   - Name your character image files starting with `$` (e.g., `$clem.png`)
-   - Export a JSON file with the same name from LibreSprite (e.g., `$clem.json`)
-
-2. **Frame naming convention:**
-   Your JSON file should contain frame names following this pattern:
-   - `idleUp0`, `idleUp1`, `idleUp2...` (idle animation facing up)
-   - `idleDown0`, `idleDown1`, `idleDown2...` (idle animation facing down)
-   - `idleLeft0`, `idleLeft1`, `idleLeft2...` (idle animation facing left)
-   - `idleRight0`, `idleRight1`, `idleRight2...` (idle animation facing right)
-   - `walkUp0`, `walkUp1`, `walkUp2...` (walking animation facing up)
-   - `walkDown0`, `walkDown1`, `walkDown2...` (walking animation facing down)
-   - `walkLeft0`, `walkLeft1`, `walkLeft2...` (walking animation facing left)
-   - `walkRight0`, `walkRight1`, `walkRight2...` (walking animation facing right)
-   - `runUp0`, `runUp1`, `runUp2...` (running animation facing up)
-   - `runDown0`, `runDown1`, `runDown2...` (running animation facing down)
-   - `runLeft0`, `runLeft1`, `runLeft2...` (running animation facing left)
-   - `runRight0`, `runRight1`, `runRight2...` (running animation facing right)
-
-3. **Missing animations:**
-   - If any of the 12 animation sequences are missing, the plugin will display the very first frame of the sprite sheet
-
-### Plugin Parameters
-
-#### Speed Modifiers
-
-Each animation type has its own speed modifier. Use `f` to represent the frame count in your formula.
-
-**Examples:**
-- `f * 0.5` - Slower animation (half speed)
-- `f * 0.8` - Slightly slower
-- `f * 1.0` - Normal speed
-- `f * 1.5` - Faster animation
-
-**Available speed modifiers:**
-- `Idle Up Speed` (default: `f * 0.5`)
-- `Idle Down Speed` (default: `f * 0.5`)
-- `Idle Left Speed` (default: `f * 0.5`)
-- `Idle Right Speed` (default: `f * 0.5`)
-- `Walk Up Speed` (default: `f * 0.8`)
-- `Walk Down Speed` (default: `f * 0.8`)
-- `Walk Left Speed` (default: `f * 0.8`)
-- `Walk Right Speed` (default: `f * 0.8`)
-- `Run Up Speed` (default: `f * 1.0`)
-- `Run Down Speed` (default: `f * 1.0`)
-- `Run Left Speed` (default: `f * 1.0`)
-- `Run Right Speed` (default: `f * 1.0`)
-
-#### Run Speed Threshold
-
-- **Default:** 5
-- **Range:** 1-8
-- Determines the character's move speed value at which the character is considered "running" instead of "walking"
-
-### Tips
-
-- If different directions have different frame counts (e.g., left/right have 6 frames, up/down have 4), adjust speed modifiers accordingly to make them play at the same visual speed
-- Example: If left has 6 frames and up has 4, use `f * 1.5` for left and `f * 1.0` for up to match speeds
+1. [Quick reference](#quick-reference)
+2. [Recommended plugin order](#recommended-plugin-order)
+3. [Plugins (reference)](#plugins-reference)
+4. [Cutscenes, pictures, and scripting](#cutscenes-pictures-and-scripting)
+5. [Installation](#installation)
+6. [Compatibility & troubleshooting](#compatibility--troubleshooting)
+7. [License](#license)
 
 ---
 
-## KurtsPerpectivePlugin
+## Quick reference
 
-**Version:** 1.0.0
-
-Adds a 2.5D perspective effect by scaling character sprites based on their Y position on the map, creating a depth illusion.
-
-### Features
-
-- ✅ Smooth scaling based on map position
-- ✅ Configurable min/max scale values
-- ✅ Optional control point for piecewise linear scaling
-- ✅ Screen-based or map-based scaling options
-- ✅ Purely visual effect (does not affect collision or movement)
-
-### Plugin Parameters
-
-#### Min Scale
-- **Default:** 0.97
-- Scale value at the top of the map (characters appear smaller)
-- Lower values = smaller characters at top
-
-#### Max Scale
-- **Default:** 1.03
-- Scale value at the bottom of the map (characters appear larger)
-- Higher values = larger characters at bottom
-
-#### Control Point Y Position (%)
-- **Default:** -1 (disabled)
-- **Range:** -1 to 100
-- Y position as a percentage where the control point is set
-- Set to -1 to disable and use simple linear scaling
-
-#### Control Point Scale Value
-- **Default:** 1.0
-- Scale value at the control point
-- Only used if Control Point Y is set (not -1)
-
-#### Use Screen-Based Scaling
-- **Default:** false
-- If ON, scaling is relative to screen position
-- If OFF, scaling is relative to map position
-
-### Control Point System
-
-The control point allows you to create a two-segment scaling curve for more complex depth effects.
-
-**Example Setup:**
-- Control Point Y = 50%
-- Control Point Scale = 0.5
-- Min Scale = 0.4
-- Max Scale = 1.0
-
-**Result:**
-- Top half (0-50%): Scales from 0.4 to 0.5 (faster change)
-- Bottom half (50-100%): Scales from 0.5 to 1.0 (slower change)
-
-This creates a non-linear scaling effect where characters shrink faster in the first half of the map, then slower in the second half.
-
-### Recommended Values
-
-**For indoor maps:**
-- Min Scale: 0.97
-- Max Scale: 1.03
-
-**For large outdoor maps:**
-- Min Scale: 0.95
-- Max Scale: 1.05
-
-**Note:** Keep the difference between min and max scale subtle (max ±7%) for best results. Larger differences can look stylized but may be distracting.
+| Plugin | Role |
+|--------|------|
+| **KurtsAnimationPlugin** | Per-direction frame counts via LibreSprite JSON for `$` characters |
+| **KurtsPerpectivePlugin** | Optional Y-based sprite scale (2.5D depth) |
+| **KurtsKeyMapper** | Action key + movement (e.g. WASD) |
+| **KurtsInteractionRangePlugin** | Directional interaction ranges + optional facing + icon |
+| **KurtsShakePlugin** | Player-only sprite shake |
+| **KurtsMouseWheelZoom** | Map zoom (wheel), resolution-aware; cutscene maps excluded by name |
+| **KurtsCameraLag** | Smooth follow + “static” camera when zoomed out |
+| **KurtsMapForeground** | Map-anchored foreground pictures (above chars); script opacity API |
+| **KurtsFPSLogger** | FPS console log + works with options FPS cap |
+| **KurtsOptionsMenu** | Title/options UI, resolution list, FPS, camera lag, controls |
+| **KurtsTranslationTooltip** | `\TR<text|tooltip>` hover tooltips in messages |
+| **KurtsPlayerDefaults** | Default speed / frequency / facing / through; clears transparency on map change |
+| **KurtsResolutionPictures** | Reference-based pictures + scaled message UI + `\PX` / `\PY` |
 
 ---
 
-## KurtsKeyMapper
+## Recommended plugin order
 
-**Version:** 1.0.0
+Load **KurtsResolutionPictures** before **KurtsTranslationTooltip** so tooltip scaling can use `KurtsResolutionUiScale()`.
 
-Allows you to customize keyboard controls for actions and movement, providing flexibility for different player preferences.
+Suggested order (adjust to what you enable):
 
-### Features
-
-- ✅ Customizable action button (Mouse Click, Enter, E, Space)
-- ✅ WASD movement support
-- ✅ Mouse click always works for actions (regardless of setting)
-- ✅ Multiple action keys can work simultaneously
-
-### Plugin Parameters
-
-#### Action Button Key
-Choose which keyboard key triggers actions (talking to NPCs, interacting, etc.)
-
-**Options:**
-- **Mouse Click (Default)** - Uses mouse click only
-- **Enter** - Maps Enter key to actions
-- **E** - Maps E key to actions
-- **Space** - Maps Space key to actions
-
-**Note:** Mouse click always works regardless of this setting. Multiple action keys can work simultaneously.
-
-#### Movement Keys
-Choose movement key layout
-
-**Options:**
-- **Arrow Keys (Default)** - Uses arrow keys for movement
-- **WASD** - Uses W/A/S/D keys for movement
-
-### Usage Tips
-
-- Changing settings requires reloading the game
-- If you select "E" for action button, both mouse click and E will work
-- WASD movement works alongside arrow keys (both are active when WASD is selected)
+1. KurtsAnimationPlugin  
+2. KurtsPerpectivePlugin (if used)  
+3. KurtsKeyMapper  
+4. KurtsInteractionRangePlugin  
+5. KurtsShakePlugin  
+6. KurtsMouseWheelZoom  
+7. KurtsCameraLag  
+8. KurtsMapForeground *(after zoom & camera lag)*  
+9. KurtsFPSLogger  
+10. KurtsOptionsMenu *(after CameraLag, KeyMapper, FPSLogger)*  
+11. KurtsResolutionPictures  
+12. KurtsTranslationTooltip  
+13. KurtsPlayerDefaults  
 
 ---
 
-## KurtsInteractionRangePlugin
+## Plugins (reference)
 
-**Version:** 1.0.0
+### KurtsAnimationPlugin
 
-Expands the interaction area of events using a high-performance range-checking system. No event cloning - just smart interaction detection that scales to hundreds of events without performance issues.
+- **Purpose:** Use different frame counts per animation (idle / walk / run × 4 directions) using JSON exported from LibreSprite.
+- **Files:** `$Name.png` + optional `$Name.json` in `img/characters/`.
+- **Frame names:** e.g. `idleUp0`, `walkLeft3`, `runDown2`, etc. (see plugin help for full list).
+- **Parameters:** Speed formulas use `f` (frame count) per direction; run threshold; optional debug overlay; **JSON Animation Characters** whitelist (only listed `$` sheets load JSON; empty uses built-in default); **Static Dollar Characters** when whitelist is empty.
+- **Missing data:** Falls back safely when animations or JSON are missing.
 
-### Features
+### KurtsPerpectivePlugin
 
-- ✅ Expand interaction area in all directions (square grid)
-- ✅ No visual duplication (single event sprite)
-- ✅ High performance - O(1) per event check
-- ✅ Scales to hundreds of events without lag
-- ✅ Works with all event trigger types
-- ✅ Simple note tag configuration
-- ✅ Configurable default range via plugin manager
-- ✅ Debug logging for troubleshooting
-- ✅ No memory overhead - no clones created
-- ✅ Safe for save/load
-- ✅ Backward compatible (events without tag work normally)
+- **Purpose:** Scale character sprites by Y (map or screen) for a simple depth effect. **Visual only** — no collision changes.
+- **Status:** Often disabled in projects; enable if you want the effect.
 
-### Plugin Parameters
+### KurtsKeyMapper
 
-#### Default Range
-- **Default:** 4
-- **Range:** 0-20
-- Default interaction range for events that don't have a note tag
-- Set to 0 to disable default (only events with note tags will have expanded range)
+- **Purpose:** Choose **action** key (e.g. E, Space, Enter — mouse still works) and **movement** layout (arrows vs WASD).
 
-#### Enable Debug
-- **Default:** true
-- Enable console logging for debugging
-- Turn OFF in production to reduce console spam
+### KurtsInteractionRangePlugin
 
-### Usage
+- **Purpose:** Expand how far the player can trigger events, with **per-direction** ranges and optional **facing** rules; optional **interact** icon above the player.
+- **Note tag format:** `<interactionRange:URDL[suffix]>` — four digits = up, right, down, left tile reach; optional suffix `u` `d` `l` `r` for which facings show the icon (e.g. `lu`).
+- **Hide icon on a page:** `<noInteractIcon>` in notes.
+- **Parameters:** Debug log, icon graphic (`img/system/`), icon Y offset, interaction origin % on sprite.
 
-1. **Add the note tag to your event (optional):**
-   In the event's Note box, add:
-   ```
-   <interactionRange:4>
-   ```
-   If no note tag is specified, the Default Range parameter will be used.
+### KurtsShakePlugin
 
-2. **Set the interaction range:**
-   The number represents tiles in each direction:
-   - `4` = 4 tiles left, right, up, and down (9x9 area total)
-   - `2` = 2 tiles in each direction (5x5 area total)
-   - `8` = 8 tiles in each direction (17x17 area total)
+- **Script:** `$gamePlayer.startShake(power, speed, duration);` — shakes **player sprite only** (not the camera).  
+- Example: `$gamePlayer.startShake(4, 10, 20);`
 
-3. **Configure event trigger:**
-   Works with all trigger types:
-   - **Action Button** (0) - Press action key when facing the event
-   - **Player Touch** (1) - Player walks into the event
-   - **Event Touch** (2) - Event touches the player
+### KurtsMouseWheelZoom
 
-### Examples
+- **Purpose:** Wheel zoom on **Scene_Map**; zoom is expressed as a **factor** relative to **1280×** reference width so the same world area feels consistent across resolutions.
+- **Script:** `resetMapZoom()`, `setMapZoom(factor)`, `getMapZoom()`.
+- **Cutscene maps:** If the map’s **display name** starts with `cutscene` (case-insensitive), this plugin does **not** apply (no wheel zoom, default parallax behaviour for that map).
+- **Parameters:** Min/max factor, step, smoothness, **Disable During Events** (main map interpreter only — Parallel does not block), **Disable During Message** (blocks while dialogue / message window / scroll text is active).
 
-**Small interaction zone:**
-```
-<interactionRange:2>
-```
-Creates a 5x5 tile interaction area.
+### KurtsCameraLag
 
-**Medium interaction zone:**
-```
-<interactionRange:4>
-```
-Creates a 9x9 tile interaction area (as shown in your screenshot).
+- **Purpose:** Camera eases toward the player instead of snapping; when zoom is at or below a **scaled** threshold, the camera can stay **centered** on the map (“static” mode).
+- **Options menu:** `ConfigManager.cameraLag` is driven by **KurtsOptionsMenu** when used together.
 
-**Large interaction zone:**
-```
-<interactionRange:8>
-```
-Creates a 17x17 tile interaction area.
+### KurtsMapForeground
 
-### How It Works
+- **Purpose:** Draw `img/pictures/` layers **above** tiles and characters, aligned like parallax (bottom-right of picture to bottom-right of map), with optional global offset.
+- **Map note:** `<foreground:pictureName>` (multiple lines allowed).
+- **Not** controllable with **Show Picture** / **Move Picture** — use **Script**:
+  - `setForegroundOpacity("name", 0–255)` or `"all"`
+  - `fadeForeground("name", targetOpacity, frames)`
+  - `isForegroundFading("name")`
+- **Order:** After MouseWheelZoom and CameraLag.
 
-- Uses a high-performance range-checking system that runs only when interaction is checked
-- Checks if the player is within the specified range of any event with the `interactionRange` tag
-- Uses Manhattan distance (square grid) - checks both X and Y distance
-- No event cloning - expands interaction logic, not the map
-- Only one event image is displayed (no duplication)
-- The event logic runs once when triggered (no duplication)
-- Industry-standard approach used by professional RPG Maker developers
+### KurtsFPSLogger
 
-### Debugging
+- **Purpose:** Optional **once-per-second** FPS log in the browser console (F8); integrates with **FPS limit** from options via `ConfigManager.fpsLimit`.
 
-When debug logging is enabled, the plugin will log:
-- Total events on the map
-- Events with interaction range configured
-- Events currently in range of the player
-- Events that were triggered
-- Event positions and distances
+### KurtsOptionsMenu
 
-Open the browser console (F8) to see debug information.
+- **Purpose:** Custom title / options / game menu styling (e.g. `fonts/RoyalnCurvy.ttf`, `img/pictures/menuBg.png`), **resolution** dropdown (16:9 presets), **FPS limit**, **camera lag** slider, **movement** and **action** controls (works with KurtsKeyMapper / ConfigManager).
+- **Load after:** KurtsCameraLag, KurtsKeyMapper, KurtsFPSLogger.
 
-### Tips
+### KurtsTranslationTooltip
 
-- Use larger ranges for important NPCs or objects that should be easy to interact with
-- Combine with different trigger types for different interaction styles
-- Events without the tag will use the Default Range parameter (if set)
-- The range is checked from the event's position, not the player's
-- Turn off debug logging in production for better performance
+- **Purpose:** In **Show Text**, use `\TR<shown text|tooltip text>` — the left part is styled (default gold + underline); hovering shows the translation in a picture-backed tooltip.
+- **Parameters:** Box picture name, font size, colour, Y offset, **Match Resolution UI Scaling** (ties to KurtsResolutionPictures).
+- **Load after:** KurtsResolutionPictures (recommended).
+
+### KurtsPlayerDefaults
+
+- **Purpose:** Applies move speed, frequency, facing (optional), and **Through** on new game and **after every map transfer**.
+- **Extra:** When transferring to a **different map**, forces `$gamePlayer.setTransparent(false)` so cutscenes that hide the player do not leave them invisible on the next map.
+
+### KurtsResolutionPictures
+
+- **Reference size:** Default **1280×720** (parameters: Reference Width / Height). All **Show Picture** / **Move Picture** **x, y, and scale** are interpreted in that space, then adjusted for real resolution and **screen zoom** so layout stays consistent.
+- **Message window:** Scales height, padding, font, and **line height** so text does not overlap at low resolutions; **Name Box** matches.
+- **Escape codes in text:** `\PX[n]` and `\PY[n]` position using reference vs current box size.
+- **Script API:** `window.KurtsResolutionUiScale()` → `Graphics.boxHeight / Reference Height` for custom UI or other plugins.
 
 ---
 
-## KurtsShakePlugin
+## Cutscenes, pictures, and scripting
 
-**Version:** 1.0.0
+This project treats **1280×720** (or your Reference Width/Height) as the layout coordinate system for **pictures** when **KurtsResolutionPictures** is on.
 
-Adds a sprite shake effect for the player character. Shakes only the player sprite, not the camera, creating a localized visual effect perfect for impacts, hits, or dramatic moments.
+### 1. “Cutscene” maps and zoom
 
-### Features
+- Set the map **Display Name** (Map Properties) to something starting with **`cutscene`** so **KurtsMouseWheelZoom** fully skips that map (no wheel zoom, no per-frame zoom from that plugin).
+- Useful for comic-style maps driven by pictures instead of tile movement.
 
-- ✅ Player sprite shake only (no camera shake)
-- ✅ Configurable power, speed, and duration
-- ✅ Smooth sine wave-based shake animation
-- ✅ Easy to call from event scripts
-- ✅ Lightweight and performant
+### 2. Picture helpers in Script blocks
 
-### Usage
-
-Call from an event script:
+A common pattern is to define small helpers at the top of a Script command, then call them:
 
 ```javascript
-$gamePlayer.startShake(power, speed, duration);
+function picShow(id, name, origin, x, y, scalePct, opacity) {
+    $gameScreen.showPicture(id, name, origin, x, y, scalePct, scalePct, opacity, 0);
+}
+function picMove(id, origin, x, y, scalePct, opacity, duration) {
+    $gameScreen.movePicture(id, origin, x, y, scalePct, scalePct, opacity, 0, duration);
+}
+function picErase(id) {
+    $gameScreen.erasePicture(id);
+}
 ```
 
-**Parameters:**
-- `power` - Shake intensity (higher = more shake)
-- `speed` - Shake speed (higher = faster shake)
-- `duration` - Number of frames the shake lasts
+- **x, y, scalePct** are in **reference** space; the plugin converts to stored coordinates and scale for the current resolution and zoom.
+- **Fade screen:** use event commands **Fadeout Screen** (221) / **Fadein Screen** (222) around transfers or picture setup.
+- **Wait:** use event **Wait** commands for delays; do not rely on `this.wait()` inside a single Script block unless you understand interpreter timing (see below).
 
-### Examples
+### 3. Hiding the player during a cutscene
 
-**Light shake:**
-```javascript
-$gamePlayer.startShake(2, 5, 15);
-```
+- **Script:** `$gamePlayer.setTransparent(true);` — player is invisible but can still run events.
+- **Important:** Before **Transfer Player** (or on the destination map), use `$gamePlayer.setTransparent(false);` **or** rely on **KurtsPlayerDefaults**, which clears transparency when changing maps.
 
-**Medium shake:**
-```javascript
-$gamePlayer.startShake(4, 10, 20);
-```
+### 4. Parallel vs Autorun; “event running” vs zoom
 
-**Strong shake:**
-```javascript
-$gamePlayer.startShake(8, 15, 30);
-```
+- **Autorun** that never turns off a self-switch will **freeze** the map; prefer **Parallel** for loops, or Autorun + self-switch + empty second page.
+- **KurtsMouseWheelZoom** “Disable During Events” uses the **main map interpreter** (`$gameMap._interpreter`), not `isEventRunning()`, so **Parallel** events do **not** block wheel zoom the same way Autorun does.
 
-### Use Cases
+### 5. Message text and layout
 
-- Character taking damage
-- Impact effects
-- Dramatic moments
-- Environmental effects (earthquake, explosion nearby)
-- Status effects (poison, confusion)
+- **KurtsResolutionPictures:** message and name box scale with resolution; use **\PX[n]** and **\PY[n]** for pixel-precise placement in reference space.
+- **KurtsTranslationTooltip:** `\TR<shown text|tooltip text>` — multiple per message allowed; tooltip image in `img/pictures/`.
 
-### Tips
+### 6. Foreground (room overlays) vs pictures
 
-- Lower power values (2-4) work well for subtle effects
-- Higher power values (6-10) create dramatic shake effects
-- Speed controls how fast the shake oscillates
-- Duration is in frames (60 frames = 1 second at 60 FPS)
+- **Show Picture** = screen picture stack (good for cutscenes, UI).
+- **Map foreground** = tied to the map, draws **over** the player; configured with map note `<foreground:name>` and **only** the script functions `setForegroundOpacity` / `fadeForeground` / `isForegroundFading` from **KurtsMapForeground**.
+
+### 7. Camera and zoom during gameplay
+
+- **Wheel zoom** and **camera lag** work together; at strong zoom-out, lag plugin may keep the camera **centered** on the map (see **Center Zoom Threshold**).
+- **Script:** `setMapZoom(factor)`, `resetMapZoom()`, `getMapZoom()` from **KurtsMouseWheelZoom**.
+
+### 8. Effects
+
+- **Shake:** `$gamePlayer.startShake(power, speed, duration);` (**KurtsShakePlugin**).
+
+### 9. Optional: wheel in script
+
+- `TouchInput.wheelY` can be used in **Conditional Branch → Script** for custom behaviour; remember wheel is also consumed by KurtsMouseWheelZoom on the map unless disabled by the plugin’s rules.
 
 ---
 
 ## Installation
 
-1. Copy the plugin files to your project's `js/plugins/` folder:
-   - `KurtsAnimationPlugin.js`
-   - `KurtsPerpectivePlugin.js`
-   - `KurtsKeyMapper.js`
-   - `KurtsInteractionRangePlugin.js`
-   - `KurtsShakePlugin.js`
-
-2. Open RPG Maker MZ
-
-3. Go to **Tools** → **Plugin Manager**
-
-4. Enable each plugin you want to use
-
-5. Configure the plugin parameters as needed
-
-6. Save your project
-
-### File Structure
-
-```
-Your Project/
-├── js/
-│   └── plugins/
-│       ├── KurtsAnimationPlugin.js
-│       ├── KurtsPerpectivePlugin.js
-│       ├── KurtsKeyMapper.js
-│       ├── KurtsInteractionRangePlugin.js
-│       └── KurtsShakePlugin.js
-└── img/
-    └── characters/
-        ├── $clem.png
-        └── $clem.json
-```
+1. Copy the desired `Kurts*.js` files into `js/plugins/`.
+2. RPG Maker MZ → **Tools** → **Plugin Manager** → add/enable plugins.
+3. Set **plugin order** as above.
+4. For **KurtsOptionsMenu**, add assets it expects (`fonts/`, `img/pictures/menuBg.png`, etc.) if you use that plugin.
+5. For **KurtsAnimationPlugin**, add `$` sheets and optional JSON under `img/characters/`.
 
 ---
 
-## Compatibility
+## Compatibility & troubleshooting
 
-- **RPG Maker MZ:** Compatible with all versions
-- **Other Plugins:** These plugins are designed to be compatible with most other plugins. However, if you encounter conflicts, try adjusting plugin load order in the Plugin Manager.
-- **Platform:** Works on Windows, Mac, and Linux versions of RPG Maker MZ
-
-### Plugin Load Order
-
-For best results, load plugins in this order:
-1. KurtsAnimationPlugin
-2. KurtsPerpectivePlugin
-3. KurtsKeyMapper
-4. KurtsInteractionRangePlugin
-5. KurtsShakePlugin
+- **Engine:** RPG Maker MZ.
+- **F8 console:** Use for **KurtsFPSLogger**, **KurtsInteractionRangePlugin** debug, and general errors.
+- **Line overlap in messages at low resolution:** addressed in **KurtsResolutionPictures** by fixing `calcTextHeight` vs scaled fonts; keep that plugin enabled and Reference Height aligned with your design.
+- **Invisible player after cutscene:** use `setTransparent(false)` before transfer or **KurtsPlayerDefaults**.
+- **Plugin conflicts:** change **load order** first; then check for other plugins that patch `Game_Screen` pictures, `Window_Message`, or `Game_Map` scroll.
 
 ---
 
 ## License
 
-These plugins are provided as-is for use in RPG Maker MZ projects. Feel free to modify and use them in your projects.
-
----
-
-## Support
-
-If you encounter any issues or have questions:
-1. Check that all plugin parameters are configured correctly
-2. Ensure JSON files are properly formatted (LibreSprite export)
-3. Verify character image files are named correctly (starting with `$`)
-4. Check the browser console (F8) for any error messages
-
----
-
-## Changelog
-
-### KurtsAnimationPlugin v1.0.0
-- Initial release
-- Variable frame count support
-- Individual speed modifiers for each animation
-- Configurable run speed threshold
-
-### KurtsPerpectivePlugin v1.0.0
-- Initial release
-- Y-position based scaling
-- Control point system for piecewise scaling
-- Screen-based and map-based scaling options
-
-### KurtsKeyMapper v1.0.0
-- Initial release
-- Customizable action button
-- WASD movement support
-
-### KurtsInteractionRangePlugin v1.0.0
-- Initial release
-- High-performance range-checking system (no cloning)
-- Expanded interaction areas via note tags
-- Configurable default range via plugin manager
-- Debug logging for troubleshooting
-- Support for all event trigger types
-- Scales to hundreds of events without performance issues
-
-### KurtsShakePlugin v1.0.0
-- Initial release
-- Player sprite shake effect
-- Configurable power, speed, and duration
-- Sine wave-based smooth animation
+Provided as-is for use in RPG Maker MZ projects; you may modify them for your games.
 
 ---
 

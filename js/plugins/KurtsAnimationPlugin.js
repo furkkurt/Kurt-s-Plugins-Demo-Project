@@ -2,7 +2,7 @@
 // KurtsAnimationPlugin.js
 //=============================================================================
 /*:
- * @plugindesc v1.0.0 Allows different number of frames for each character animation using JSON frame data
+ * @plugindesc v1.0.3 Allows different number of frames for each character animation using JSON frame data
  * @author Furkan Kurt
  * 
  * @param Idle Up Speed
@@ -73,6 +73,24 @@
  * @max 8
  * @default 5
  * 
+ * @param Enable Debug
+ * @text Enable Debug
+ * @desc Show on-screen debug overlay with animation state (anim, pattern, rect, etc.)
+ * @type boolean
+ * @default false
+ * 
+ * @param JSON Animation Characters
+ * @text JSON only for these $
+ * @desc ONLY these $ sheets load a .json (one per line). Leave empty to use built-in default ($clem). Add lines when you add more *.json files.
+ * @type note
+ * @default
+ * 
+ * @param Static Dollar Characters
+ * @text No-JSON $ characters
+ * @desc Used only when "JSON only for these $" is empty. One name per line; skips XHR for listed $ sheets.
+ * @type note
+ * @default
+ * 
  * @help
  * ============================================================================
  * JSON Frame Animations Plugin
@@ -101,6 +119,9 @@
  * 
  * 4. If any animation is missing, the plugin will display the very first
  *    frame of the sprite sheet (idle0 or the first frame in the JSON).
+ * 
+ * 5. "JSON only for these $" defaults to $clem when left empty (only that sheet loads .json).
+ *    Type * alone for legacy: No-JSON list + try json on every other $ sheet.
  * 
  * NOTE:
  * -----
@@ -145,6 +166,71 @@
         8: 'Up'
     };
 
+    const DEBUG = parameters['Enable Debug'] === 'true';
+
+    function normalizeCharacterKey(name) {
+        if (!name) return '';
+        let n = String(name).trim();
+        if (!n.startsWith('$')) n = '$' + n;
+        return n.replace(/\.png$/i, '');
+    }
+
+    const STATIC_CHAR_NO_JSON = (function() {
+        const raw = parameters['Static Dollar Characters'] || '';
+        const set = new Set();
+        if (!String(raw).trim()) return set;
+        String(raw).split(/[\r\n,]+/).forEach(function(line) {
+            const key = normalizeCharacterKey(line);
+            if (key.length > 1) set.add(key);
+        });
+        return set;
+    })();
+
+    /**
+     * Only these $ sheets may load img/characters/*.json (no XHR for props like $dressRed).
+     * If the plugin param is empty/missing, default to $clem (only json shipped in many projects).
+     * Set the param explicitly to add more names (one per line) when you add more .json files.
+     */
+    const JSON_ANIMATION_CHARS = (function() {
+        let raw = parameters['JSON Animation Characters'];
+        if (raw === undefined || raw === null) raw = '';
+        raw = String(raw).trim();
+        // Legacy: type * to use only "No-JSON $" + XHR for other $ (old behavior).
+        if (raw === '*') {
+            return new Set();
+        }
+        if (!raw) {
+            raw = '$clem';
+        }
+        const set = new Set();
+        String(raw).split(/[\r\n,]+/).forEach(function(line) {
+            const key = normalizeCharacterKey(line);
+            if (key.length > 1) set.add(key);
+        });
+        return set;
+    })();
+
+    let _debugDiv = null;
+    function ensureDebugDiv() {
+        if (!DEBUG) {
+            if (_debugDiv) { _debugDiv.style.display = 'none'; }
+            return null;
+        }
+        if (_debugDiv) {
+            _debugDiv.style.display = '';
+            return _debugDiv;
+        }
+        _debugDiv = document.createElement('div');
+        Object.assign(_debugDiv.style, {
+            position: 'fixed', top: '8px', left: '8px', zIndex: '9999',
+            background: 'rgba(0,0,0,0.8)', color: '#0f0', fontFamily: 'monospace',
+            fontSize: '13px', padding: '6px 10px', borderRadius: '4px',
+            pointerEvents: 'none', whiteSpace: 'pre', lineHeight: '1.4'
+        });
+        document.body.appendChild(_debugDiv);
+        return _debugDiv;
+    }
+
     // Cache for loaded JSON data
     const _jsonCache = {};
 
@@ -162,6 +248,17 @@
 
         // Check if character name starts with $
         if (!characterName || !characterName.startsWith('$')) {
+            _jsonCache[characterName] = null;
+            return null;
+        }
+
+        const key = normalizeCharacterKey(characterName);
+        if (JSON_ANIMATION_CHARS.size > 0) {
+            if (!JSON_ANIMATION_CHARS.has(key)) {
+                _jsonCache[characterName] = null;
+                return null;
+            }
+        } else if (STATIC_CHAR_NO_JSON.has(key)) {
             _jsonCache[characterName] = null;
             return null;
         }
@@ -373,10 +470,10 @@
     Sprite_Character.prototype.setCharacterBitmap = function() {
         _Sprite_Character_setCharacterBitmap.call(this);
         
-        // Check if this character uses JSON frames
         if (this._characterName && this._characterName.startsWith('$')) {
-            this._usesJsonFrames = true;
-            this._jsonFrameData = parseFrameData(this._characterName);
+            const fd = parseFrameData(this._characterName);
+            this._jsonFrameData = fd;
+            this._usesJsonFrames = !!fd;
         } else {
             this._usesJsonFrames = false;
             this._jsonFrameData = null;
@@ -389,16 +486,36 @@
     const _Sprite_Character_updateCharacterFrame = Sprite_Character.prototype.updateCharacterFrame;
     Sprite_Character.prototype.updateCharacterFrame = function() {
         if (this._usesJsonFrames && this._jsonFrameData) {
-            const frame = getCurrentFrame(this._character, this._characterName);
+            const character = this._character;
+            const frame = getCurrentFrame(character, this._characterName);
             
             if (frame && frame.frame) {
-                // Use frame coordinates from JSON
                 const frameRect = frame.frame;
                 const sx = frameRect.x;
                 const sy = frameRect.y;
                 const pw = frameRect.w;
                 const ph = frameRect.h;
-                
+
+                if (DEBUG && character === $gamePlayer) {
+                    const animType = getAnimationType(character);
+                    const dir = getDirectionName(character.direction());
+                    const animKey = animType + dir;
+                    const anim = this._jsonFrameData.animations[animKey];
+                    const totalFrames = anim ? anim.length : 0;
+                    const pat = character._pattern;
+                    const div = ensureDebugDiv();
+                    if (div) {
+                        div.textContent =
+                            `anim: ${animKey}\n` +
+                            `pattern: ${pat} / ${totalFrames}\n` +
+                            `rect: (${sx}, ${sy}, ${pw}, ${ph})\n` +
+                            `isMoving: ${character.isMoving()}\n` +
+                            `stopCount: ${character._stopCount}\n` +
+                            `forceIdle: ${!!character._forceIdleUntilMoving}\n` +
+                            `animWait: ${character.animationWait()}  jsonPatSpd: ${character._jsonPatSpd}`;
+                    }
+                }
+
                 this.updateHalfBodySprites();
                 if (this._bushDepth > 0) {
                     const d = this._bushDepth;
@@ -409,11 +526,13 @@
                     this.setFrame(sx, sy, pw, ph);
                 }
             } else {
-                // Fallback to default behavior
+                if (DEBUG && character === $gamePlayer) {
+                    const div = ensureDebugDiv();
+                    if (div) div.textContent = `NO FRAME! char: ${this._characterName}`;
+                }
                 _Sprite_Character_updateCharacterFrame.call(this);
             }
         } else {
-            // Default behavior for non-JSON characters
             _Sprite_Character_updateCharacterFrame.call(this);
         }
     };
@@ -492,14 +611,7 @@
                         this._pattern = this._pattern % animation.length;
                     }
                     
-                    // For idle animations, keep pattern at 0 (first frame)
-                    // For walk/run animations, cycle through frames
-                    if (animType === 'idle') {
-                        this._pattern = 0;
-                    } else {
-                        // Cycle through animation frames: 0 -> 1 -> 2 -> ... -> (N-1) -> 0
-                        this._pattern = (this._pattern + 1) % animation.length;
-                    }
+                    this._pattern = (this._pattern + 1) % animation.length;
                     
                     return;
                 } else {
@@ -552,6 +664,23 @@
     };
 
     /**
+     * Override isOriginalPattern so that JSON-animated characters
+     * never "settle" on the original frame -- this keeps
+     * updateAnimationCount incrementing even while idle.
+     */
+    const _Game_CharacterBase_isOriginalPattern = Game_CharacterBase.prototype.isOriginalPattern;
+    Game_CharacterBase.prototype.isOriginalPattern = function() {
+        let characterName = null;
+        try {
+            characterName = this.characterName ? this.characterName() : null;
+        } catch (e) {}
+        if (characterName && characterName.startsWith('$') && parseFrameData(characterName)) {
+            return false;
+        }
+        return _Game_CharacterBase_isOriginalPattern.call(this);
+    };
+
+    /**
      * Override Game_CharacterBase.resetPattern
      */
     const _Game_CharacterBase_resetPattern = Game_CharacterBase.prototype.resetPattern;
@@ -591,13 +720,31 @@
             // characterName() might not exist in all contexts
         }
         
-        if (characterName && characterName.startsWith('$') && this._jsonPatSpd !== undefined && this._jsonPatSpd !== null) {
-            const baseWait = _Game_CharacterBase_animationWait.call(this);
-            const newWait = Math.max(1, baseWait - this._jsonPatSpd); // Ensure minimum of 1
-            return newWait;
+        if (!characterName || !characterName.startsWith('$')) {
+            return _Game_CharacterBase_animationWait.call(this);
         }
-        
-        return _Game_CharacterBase_animationWait.call(this);
+        const frameData = parseFrameData(characterName);
+        if (!frameData) return _Game_CharacterBase_animationWait.call(this);
+        const animType = getAnimationType(this);
+        const direction = getDirectionName(this.direction());
+        const animKey = animType + direction;
+        const animation = frameData.animations[animKey];
+        if (!animation || animation.length === 0) return _Game_CharacterBase_animationWait.call(this);
+        const modifier = SPEED_MODIFIERS[animKey];
+        let jsonPatSpd = 0;
+        if (modifier) {
+            try {
+                const f = animation.length;
+                jsonPatSpd = eval(modifier);
+            } catch (e) {}
+        }
+        if (animType === 'idle') {
+            if (jsonPatSpd > 0) {
+                return Math.max(1, Math.round(15 / jsonPatSpd));
+            }
+            return 15;
+        }
+        return Math.max(1, _Game_CharacterBase_animationWait.call(this) - jsonPatSpd);
     };
 
     /**

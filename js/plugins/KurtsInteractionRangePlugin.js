@@ -369,7 +369,7 @@
         }
     }
 
-    // Override checkEventTriggerThere to include range-based events
+    // Override checkEventTriggerThere to include range-based events (Action Button)
     const _Game_Player_checkEventTriggerThere = Game_Player.prototype.checkEventTriggerThere;
     Game_Player.prototype.checkEventTriggerThere = function(triggers) {
         // Check for range-based events FIRST (before normal check)
@@ -387,7 +387,20 @@
         _Game_Player_checkEventTriggerThere.call(this, triggers);
     };
 
-    // Override checkEventTriggerTouch to include range-based events
+    // Override checkEventTriggerHere to include range-based events (Player Touch after walking)
+    // This is the MAIN path for Player Touch — called after every step the player takes
+    const _Game_Player_checkEventTriggerHere = Game_Player.prototype.checkEventTriggerHere;
+    Game_Player.prototype.checkEventTriggerHere = function(triggers) {
+        // Call original function first (handles events at player's exact tile)
+        _Game_Player_checkEventTriggerHere.call(this, triggers);
+        
+        // Then check for range-based events (handles extended range)
+        if (this.canStartLocalEvents() && !$gameMap.isAnyEventStarting()) {
+            checkEventsInRange(this, triggers);
+        }
+    };
+
+    // Override checkEventTriggerTouch to include range-based events (blocked movement)
     const _Game_Player_checkEventTriggerTouch = Game_Player.prototype.checkEventTriggerTouch;
     Game_Player.prototype.checkEventTriggerTouch = function(x, y) {
         // Call original function first (normal behavior)

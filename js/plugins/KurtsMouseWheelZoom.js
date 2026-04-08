@@ -2,12 +2,12 @@
 // KurtsMouseWheelZoom.js
 //=============================================================================
 /*:
- * @plugindesc v1.0.0 Mouse wheel zoom in/out for map camera
+ * @plugindesc v1.4.0 Mouse wheel zoom in/out for map camera (resolution-adaptive)
  * @author Furkan Kurt
  *
  * @param Min Zoom
- * @text Minimum Zoom Level
- * @desc Minimum zoom level (0.5 = 50% zoom, 1.0 = 100% zoom). Lower values zoom out more.
+ * @text Minimum Zoom Factor
+ * @desc Minimum zoom factor at reference resolution (0.5 = 50%, 1.0 = default). Lower = zoom out more.
  * @type number
  * @min 0.25
  * @max 1.0
@@ -15,8 +15,8 @@
  * @default 0.75
  *
  * @param Max Zoom
- * @text Maximum Zoom Level
- * @desc Maximum zoom level (1.0 = 100% zoom, 2.0 = 200% zoom). Higher values zoom in more.
+ * @text Maximum Zoom Factor
+ * @desc Maximum zoom factor at reference resolution (1.0 = default, 2.0 = 200%). Higher = zoom in more.
  * @type number
  * @min 1.0
  * @max 3.0
@@ -25,7 +25,7 @@
  *
  * @param Zoom Step
  * @text Zoom Step Size
- * @desc How much zoom changes per mouse wheel scroll (0.05 = small steps, 0.20 = large steps).
+ * @desc How much zoom changes per mouse wheel scroll.
  * @type number
  * @min 0.01
  * @max 0.50
@@ -34,7 +34,7 @@
  *
  * @param Smoothness
  * @text Zoom Smoothness
- * @desc How smooth the zoom animation is (0.1 = very smooth/slow, 0.5 = fast/snappy). Higher = faster.
+ * @desc How smooth the zoom animation is (0.1 = slow, 0.5 = snappy).
  * @type number
  * @min 0.05
  * @max 1.0
@@ -43,49 +43,37 @@
  *
  * @param Disable During Events
  * @text Disable Zoom During Events
- * @desc Disable zoom when events are running (prevents zoom during cutscenes/dialogue).
+ * @desc Disable zoom while the main map event is running (Autorun, touch, etc.). Parallel processes do not block. Set false to allow zoom during any script.
+ * @type boolean
+ * @default true
+ *
+ * @param Disable During Message
+ * @text Disable Zoom During Message / Text
+ * @desc When true, wheel zoom is ignored while dialogue is active: message queue, open message window, scroll text, or similar. Set false to zoom during Show Text.
  * @type boolean
  * @default true
  *
  * @help
  * ============================================================================
- * Kurts Mouse Wheel Zoom Plugin
+ * Kurts Mouse Wheel Zoom Plugin  v1.4
  * ============================================================================
  *
- * This plugin adds mouse wheel zoom functionality to the map camera.
- * Scroll the mouse wheel up to zoom in, scroll down to zoom out.
+ * RESOLUTION-ADAPTIVE ZOOM
+ * All zoom values are resolution-independent "factors" relative to a
+ * 1280×720 reference.  The engine zoom is automatically scaled so the
+ * same visible world area is shown at every screen resolution.
  *
- * FEATURES:
- * --------
- * - Smooth zoom animation
- * - Configurable zoom limits (min/max)
- * - Configurable zoom step size
- * - Configurable smoothness
- * - Optional disable during events
- * - Visual-only zoom (no collision changes)
+ *   factor 1.0  = default view (same tiles visible as 1280×720 @ zoom 1×)
+ *   factor 0.75 = zoomed out  (more tiles visible)
+ *   factor 1.50 = zoomed in   (fewer tiles visible)
  *
- * USAGE:
- * ------
- * Simply scroll your mouse wheel up or down while on the map.
+ * Script calls:
+ *   resetMapZoom()        — reset to default
+ *   setMapZoom(factor)    — set zoom factor (0.75 – 1.50)
+ *   getMapZoom()          — current target factor
  *
- * - Scroll Up: Zoom in
- * - Scroll Down: Zoom out
- *
- * RESET ZOOM:
- * -----------
- * You can reset zoom to default (1.0) from an event using:
- *
- *   ◆ Script: resetMapZoom();
- *
- * NOTES:
- * ------
- * - Uses engine's built-in zoom system for proper rendering
- * - Full map and parallax render correctly when zoomed out (no black void)
- * - Zoom is visual only - collision detection remains unchanged
- * - Works with all existing plugins (perspective, interaction range, shake, etc.)
- * - UI elements (message boxes, menus) do not zoom (stays readable)
- * - Zoom centers on player position
- * - Zoom resets when changing maps
+ * Maps whose display name starts with "cutscene" (case-insensitive) skip
+ * this plugin entirely: no wheel zoom, no per-frame zoom, default parallax.
  *
  * ============================================================================
  */
@@ -94,156 +82,153 @@
     'use strict';
 
     const parameters = PluginManager.parameters('KurtsMouseWheelZoom');
-    const MIN_ZOOM = Number(parameters['Min Zoom'] || 0.75);
-    const MAX_ZOOM = Number(parameters['Max Zoom'] || 1.50);
-    const ZOOM_STEP = Number(parameters['Zoom Step'] || 0.10);
+    const MIN_ZOOM   = Number(parameters['Min Zoom'] || 0.75);
+    const MAX_ZOOM   = Number(parameters['Max Zoom'] || 1.50);
+    const ZOOM_STEP  = Number(parameters['Zoom Step'] || 0.10);
     const SMOOTHNESS = Number(parameters['Smoothness'] || 0.20);
     const DISABLE_DURING_EVENTS = parameters['Disable During Events'] !== 'false';
+    const DISABLE_DURING_MESSAGE = parameters['Disable During Message'] !== 'false';
 
-    // Target zoom level (what we're aiming for)
-    let targetZoom = 1.0;
+    // Reference resolution — all factors are defined relative to this width
+    const REFERENCE_WIDTH = 1280;
 
-    /**
-     * Reset zoom to default (1.0)
-     * Can be called from events using: resetMapZoom();
-     */
+    /** Resolution scale: current width ÷ reference width */
+    function getResScale() {
+        return Graphics.width / REFERENCE_WIDTH;
+    }
+
+    function isCutsceneMap() {
+        // Do not call $gameMap.displayName() — it reads $dataMap.displayName and throws if $dataMap is null (title, loading, etc.)
+        if (!$gameMap || !$dataMap) return false;
+        const name = String($dataMap.displayName || '')
+            .trim()
+            .toLowerCase();
+        return name.startsWith('cutscene');
+    }
+
+    /** Main map interpreter only — not parallel map/common event interpreters */
+    function isMainMapEventRunning() {
+        return $gameMap && $gameMap._interpreter && $gameMap._interpreter.isRunning();
+    }
+
+    /** Show Text, choices, scroll text, or message window still open */
+    function isMapMessageOrTextActive() {
+        if (!$gameMessage) return false;
+        if ($gameMessage.isBusy()) return true;
+        const scene = SceneManager._scene;
+        if (!scene || scene.constructor !== Scene_Map) return false;
+        const mw = scene._messageWindow;
+        if (mw && mw.isOpen()) return true;
+        const sw = scene._scrollTextWindow;
+        if (sw && sw.visible && sw._text) return true;
+        return false;
+    }
+
+    // Resolution-independent zoom factor (1.0 = default view at any res)
+    let targetFactor = 1.0;
+
+    // ---- public helpers -------------------------------------------------
+
     window.resetMapZoom = function() {
-        targetZoom = 1.0;
+        targetFactor = 1.0;
     };
 
-    /**
-     * Set zoom level programmatically
-     * @param {number} zoom - Zoom level (clamped to min/max)
-     */
-    window.setMapZoom = function(zoom) {
-        targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number(zoom) || 1.0));
+    window.setMapZoom = function(factor) {
+        targetFactor = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, Number(factor) || 1.0));
     };
 
-    /**
-     * Get current target zoom level
-     * @returns {number} Current target zoom
-     */
     window.getMapZoom = function() {
-        return targetZoom;
+        return targetFactor;
     };
 
-    // Override Input.update to capture mouse wheel
+    // ---- mouse-wheel input ----------------------------------------------
+
     const _Input_update = Input.update;
     Input.update = function() {
         _Input_update.call(this);
 
-        // Only process zoom on map scene
         if (SceneManager._scene && SceneManager._scene.constructor === Scene_Map) {
-            // Check if zoom should be disabled
-            if (DISABLE_DURING_EVENTS && $gameMap && $gameMap.isEventRunning()) {
-                return;
-            }
+            if (isCutsceneMap()) return;
+            if (DISABLE_DURING_EVENTS && isMainMapEventRunning()) return;
+            if (DISABLE_DURING_MESSAGE && isMapMessageOrTextActive()) return;
 
-            // Check for mouse wheel input
             if (TouchInput.wheelY !== 0) {
-                if (TouchInput.wheelY > 0) {
-                    // Scroll up = zoom in (increase zoom)
-                    targetZoom += ZOOM_STEP;
-                } else {
-                    // Scroll down = zoom out (decrease zoom)
-                    targetZoom -= ZOOM_STEP;
-                }
-
-                // Clamp zoom to min/max limits
-                targetZoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetZoom));
+                targetFactor += (TouchInput.wheelY > 0 ? ZOOM_STEP : -ZOOM_STEP);
+                targetFactor  = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, targetFactor));
             }
         }
     };
 
-    // Override Game_Map.update to apply smooth zoom via Game_Screen
-    // This ensures proper rendering of tiles and parallax when zoomed out
+    // ---- apply zoom each frame ------------------------------------------
+
     const _Game_Map_update = Game_Map.prototype.update;
     Game_Map.prototype.update = function(sceneActive) {
         _Game_Map_update.call(this, sceneActive);
 
-        // Only update zoom on map scene when active
-        if (!sceneActive || !SceneManager._scene || SceneManager._scene.constructor !== Scene_Map) {
-            return;
-        }
+        if (!sceneActive || !SceneManager._scene ||
+            SceneManager._scene.constructor !== Scene_Map) return;
+        if (isCutsceneMap()) return;
+        if (DISABLE_DURING_EVENTS && isMainMapEventRunning()) return;
+        if (DISABLE_DURING_MESSAGE && isMapMessageOrTextActive()) return;
 
-        // Check if zoom should be disabled
-        if (DISABLE_DURING_EVENTS && this.isEventRunning()) {
-            return;
-        }
+        // Engine zoom = factor × resolution scale
+        const resScale     = getResScale();
+        const engineTarget = targetFactor * resScale;
+        const currentZoom  = $gameScreen.zoomScale();
+        const newZoom      = currentZoom + (engineTarget - currentZoom) * SMOOTHNESS;
 
-        // Get current zoom from Game_Screen
-        const currentZoom = $gameScreen.zoomScale();
-
-        // Smoothly interpolate toward target zoom
-        // SMOOTHNESS: 0.1 = very smooth/slow, 0.5 = fast/snappy
-        const newZoom = currentZoom + (targetZoom - currentZoom) * SMOOTHNESS;
-
-        // Center zoom on screen center (not player position)
-        // Camera plugin controls position, zoom plugin only controls scale
-        const zoomX = Graphics.width / 2;
-        const zoomY = Graphics.height / 2;
-
-        // Apply zoom using Game_Screen.setZoom (this ensures proper rendering)
-        $gameScreen.setZoom(zoomX, zoomY, newZoom);
+        // Zoom centred on screen centre (camera plugin handles position)
+        $gameScreen.setZoom(Graphics.width / 2, Graphics.height / 2, newZoom);
     };
 
-    // Override Spriteset_Map.createParallax to force full map-sized parallax
-    // This makes parallax render as a map-sized background sprite instead of tiling
+    // ---- full-map parallax ----------------------------------------------
+
     const _Spriteset_Map_createParallax = Spriteset_Map.prototype.createParallax;
     Spriteset_Map.prototype.createParallax = function() {
         _Spriteset_Map_createParallax.call(this);
-
+        if (isCutsceneMap()) return;
         if (!this._parallax) return;
 
-        // Force parallax to be full map size
-        const mapW = $gameMap.width() * $gameMap.tileWidth();
+        const mapW = $gameMap.width()  * $gameMap.tileWidth();
         const mapH = $gameMap.height() * $gameMap.tileHeight();
-
-        // Set parallax to full map dimensions
-        this._parallax.width = mapW;
+        this._parallax.width  = mapW;
         this._parallax.height = mapH;
-
-        // Disable engine's parallax scrolling (we'll handle it manually)
         this._parallax.origin.x = 0;
         this._parallax.origin.y = 0;
     };
 
-    // Override Spriteset_Map.updateParallax to manually position parallax based on camera
-    // This ensures parallax stays aligned with tiles and renders fully when zoomed out
     const _Spriteset_Map_updateParallax = Spriteset_Map.prototype.updateParallax;
     Spriteset_Map.prototype.updateParallax = function() {
-        // Don't call original updateParallax - we're handling it completely manually
-        // _Spriteset_Map_updateParallax.call(this);
-        
+        if (isCutsceneMap()) {
+            _Spriteset_Map_updateParallax.call(this);
+            return;
+        }
         if (!this._parallax) return;
 
-        const tileW = $gameMap.tileWidth();
-        const tileH = $gameMap.tileHeight();
-
-        // Update bitmap if parallax name changed
         if (this._parallaxName !== $gameMap.parallaxName()) {
             this._parallaxName = $gameMap.parallaxName();
             this._parallax.bitmap = ImageManager.loadParallax(this._parallaxName);
         }
 
-        // Camera position in world pixels
-        const camX = $gameMap.displayX() * tileW;
-        const camY = $gameMap.displayY() * tileH;
-
-        // Move parallax opposite to camera to keep it aligned with tiles
-        // Zoom will scale it naturally since it's a full map-sized sprite
+        const camX = $gameMap.displayX() * $gameMap.tileWidth();
+        const camY = $gameMap.displayY() * $gameMap.tileHeight();
         this._parallax.x = -camX;
         this._parallax.y = -camY;
     };
 
-    // Reset zoom when map changes
+    // ---- reset on map change --------------------------------------------
+
     const _Scene_Map_start = Scene_Map.prototype.start;
     Scene_Map.prototype.start = function() {
         _Scene_Map_start.call(this);
-        // Reset zoom to default when entering a new map
-        targetZoom = 1.0;
-        // Clear zoom immediately using Game_Screen
-        $gameScreen.clearZoom();
+        if (isCutsceneMap()) {
+            $gameScreen.setZoom(0, 0, 1);
+            return;
+        }
+        targetFactor = 1.0;
+        // Set zoom immediately to the resolution-correct default (no transition)
+        const resScale = getResScale();
+        $gameScreen.setZoom(Graphics.width / 2, Graphics.height / 2, resScale);
     };
 
 })();
