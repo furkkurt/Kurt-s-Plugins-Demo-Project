@@ -1,0 +1,50 @@
+[0603/181858.151:ERROR:process_info.cc(118)] ReadProcessMemory bool __cdecl crashpad::(anonymous namespace)::ReadStruct(HANDLE, crashpad::WinVMAddress, T *) [T = crashpad::process_types::PEB<crashpad::process_types::internal::Traits64>]: Access denied. (0x5)
+[0603/181858.167:ERROR:process_info.cc(551)] ReadProcessData failed
+[0603/181858.174:ERROR:process_info.cc(118)] ReadProcessMemory bool __cdecl crashpad::(anonymous namespace)::ReadStruct(HANDLE, crashpad::WinVMAddress, T *) [T = crashpad::process_types::PEB<crashpad::process_types::internal::Traits64>]: Access denied. (0x5)
+[0603/181858.174:ERROR:process_info.cc(551)] ReadProcessData failed
+[0603/212637.993:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\ntdll.dll
+[0603/212637.993:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\kernel32.dll
+[0603/212637.994:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\kernelbase.dll
+[0603/212637.994:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\VERSION.dll
+[0603/212637.994:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\ucrtbase.dll
+[0603/212637.995:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\msvcrt.dll
+[0603/212637.995:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\ADVAPI32.dll
+[0603/212637.995:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\rpcrt4.dll
+[0603/212637.995:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\cryptbase.dll
+[0603/212637.995:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\sechost.dll
+[0603/212637.996:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\WS2_32.dll
+[0603/212637.996:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\IPHLPAPI.DLL
+[0603/212637.996:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\dnsapi.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\nsi.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\OLEAUT32.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\gdi32.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\user32.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\win32u.dll
+[0603/212637.997:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\ole32.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\combase.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\coml2.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\WINMM.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\msacm32.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\UIAutomationCore.DLL
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\oleacc.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\Secur32.dll
+[0603/212637.998:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\USERENV.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\WINTRUST.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\crypt32.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\bcrypt.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\dbghelp.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\DWrite.dll
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\WINSPOOL.DRV
+[0603/212637.999:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\compstui.dll
+[0603/212638.000:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\winsxs\amd64_microsoft.windows.common-controls_6595b64144ccf1df_6.0.2600.2982_none_deadbeef\comctl32.dll
+[0603/212638.000:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\imm32.dll
+[0603/212638.000:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\WINHTTP.dll
+[0603/212638.000:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\jsproxy.dll
+[0603/212638.000:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\dhcpcsvc.DLL
+[0603/212638.001:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\Kerberos.dll
+[0603/212638.001:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\MSV1_0.dll
+[0603/212638.001:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\netapi32.dll
+[0603/212638.001:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\netutils.dll
+[0603/212638.001:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\PSAPI.DLL
+[0603/212638.002:WARNING:pe_image_reader.cc(181)] CodeView debug entry of unexpected size in C:\windows\system32\powrprof.dll
+[0603/212638.997:ERROR:http_transport_win.cc(178)] WinHttpCrackUrl: Success. (0x0)

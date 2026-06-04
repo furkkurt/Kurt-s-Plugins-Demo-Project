@@ -2,20 +2,25 @@
 // KurtsOptionsMenu.js
 //=============================================================================
 /*:
- * @plugindesc v3.2.0 Custom menus with RoyalnCurvy font, styled selections, menuBg background
+ * @plugindesc v3.2.1 Custom menus with RoyalnCurvy font, styled selections, menuBg background
  * @author Furkan Kurt
+ *
+ * @param Title Logo Picture
+ * @desc Filename in img/pictures/ without extension. Replaces title text on the title screen. Leave empty to show "LINE" instead.
+ * @default logo
  *
  * @help
  * ============================================================================
- * Kurts Options Menu v3.2
+ * Kurts Options Menu v3.2.1
  * ============================================================================
  *
  * Uses fonts/RoyalnCurvy.ttf as the game-wide font.
  * Uses img/pictures/menuBg.png as the background for title, options,
  * controls, and in-game menu scenes.
  *
- * Title screen shows "LINE" at the top-right, with the command window
- * positioned at the centre-right (no borders, no cursor).
+ * Title screen shows the title logo picture (img/pictures/, default: logo) at the
+ * top-right, or drawn "LINE" if Title Logo Picture is left empty. Command window
+ * stays centre-right (no borders, no cursor).
  *
  * All custom windows use:
  *   - Transparent background (no white borders)
@@ -44,11 +49,19 @@
  * database size). Title command text/rows scale with box width vs 1280. Resolution
  * choice saves immediately when confirmed in the dropdown.
  * v3.2: Options + Controls menus use the same 1280-ref scaling as the title menu.
+ * v3.2.1: Title logo from img/pictures/ (parameter) replaces drawn "LINE" text.
  * ============================================================================
  */
 
 (() => {
     'use strict';
+
+    const _komParams = PluginManager.parameters('KurtsOptionsMenu');
+    const TITLE_LOGO_PICTURE = String(
+        _komParams['Title Logo Picture'] != null
+            ? _komParams['Title Logo Picture']
+            : 'logo'
+    ).trim();
 
     // ========================================================================
     // Configuration Constants
@@ -93,6 +106,8 @@
     const MENU_REF_WIDTH      = 1280;
     const TITLE_BASE_LINE_H   = 36;
     const TITLE_ROW_EXTRA     = 8;                  // selectable row gap (engine default)
+    /** Extra downward shift for title command window when logo picture is used (ref px @ 1280) */
+    const TITLE_COMMAND_LOGO_CLEARANCE = 88;
 
     // --- Font & Title ---
     const CUSTOM_FONT_NAME = 'RoyalnCurvy';
@@ -155,8 +170,9 @@
         const res = RESOLUTIONS[index];
         if (!res) return;
         Graphics.resize(res.w, res.h);
-        Graphics.boxWidth  = res.w;
-        Graphics.boxHeight = res.h;
+        const margin = 4;
+        Graphics.boxWidth = res.w - margin * 2;
+        Graphics.boxHeight = res.h - margin * 2;
         if (typeof nw !== 'undefined' && nw.Window) {
             const win = nw.Window.get();
             if (win) win.resizeTo(res.w, res.h);
@@ -214,8 +230,14 @@
     const _Scene_Boot_resizeScreen = Scene_Boot.prototype.resizeScreen;
     Scene_Boot.prototype.resizeScreen = function() {
         _Scene_Boot_resizeScreen.call(this);
-        applyResolution(ConfigManager.screenResolution);
+        const idx = ConfigManager.screenResolution;
+        if (idx != null && RESOLUTIONS[idx]) {
+            applyResolution(idx);
+        }
         Graphics.defaultScale = this.screenScale();
+        if (Utils.isNwjs()) {
+            this.adjustWindow();
+        }
     };
 
     // ========================================================================
@@ -729,16 +751,38 @@
 
     Scene_Title.prototype.adjustBackground = function() {};
 
-    // --- Foreground: always draw custom title ---
+    // --- Foreground: title logo picture or drawn "LINE" ---
     Scene_Title.prototype.createForeground = function() {
-        this._gameTitleSprite = new Sprite(
-            new Bitmap(Graphics.width, Graphics.height)
-        );
+        this._gameTitleSprite = new Sprite();
         this.addChild(this._gameTitleSprite);
-        this.drawGameTitle();
+        if (TITLE_LOGO_PICTURE) {
+            const bmp = ImageManager.loadPicture(TITLE_LOGO_PICTURE);
+            this._gameTitleSprite.bitmap = bmp;
+            bmp.addLoadListener(() => this._layoutTitleLogo());
+        } else {
+            this._gameTitleSprite.bitmap = new Bitmap(Graphics.width, Graphics.height);
+            this.drawGameTitle();
+        }
     };
 
-    // --- Draw "LINE" at top-right ---
+    Scene_Title.prototype._layoutTitleLogo = function() {
+        const spr = this._gameTitleSprite;
+        if (!spr || !spr.bitmap || !spr.bitmap.isReady()) return;
+        const bmp = spr.bitmap;
+        if (bmp.width <= 0 || bmp.height <= 0) return;
+        const ts = titleMenuScale();
+        const maxW = Math.round(400 * ts);
+        const maxH = Math.round(100 * ts);
+        const sc = Math.min(maxW / bmp.width, maxH / bmp.height) * 2;
+        spr.scale.x = spr.scale.y = sc;
+        spr.anchor.x = 1;
+        spr.anchor.y = 0;
+        const logoRightGap = Math.round(8 * ts);
+        spr.x = Graphics.width - menuScaledRightMargin() - logoRightGap;
+        spr.y = Math.max(0, Math.round(Graphics.height * 0.04 - 16 * ts));
+    };
+
+    // --- Draw "LINE" at top-right (when Title Logo Picture is empty) ---
     Scene_Title.prototype.drawGameTitle = function() {
         const bitmap = this._gameTitleSprite.bitmap;
         bitmap.fontFace = CUSTOM_FONT_NAME + ', sans-serif';
@@ -761,7 +805,12 @@
         const ww = Math.min(Math.max(120, Math.round(300 * s)), Graphics.boxWidth - 20);
         const wh = titleCommandWindowHeight(3);
         const wx = Math.max(menuScaledMargin(), Graphics.boxWidth - ww - menuScaledRightMargin());
-        const wy = Math.round((Graphics.boxHeight - wh) / 2);
+        let wy = Math.round((Graphics.boxHeight - wh) / 2);
+        if (TITLE_LOGO_PICTURE) {
+            wy += Math.round(TITLE_COMMAND_LOGO_CLEARANCE * s);
+            const maxY = Graphics.boxHeight - wh - menuScaledMargin();
+            wy = Math.min(wy, maxY);
+        }
         return new Rectangle(wx, wy, ww, wh);
     };
 
@@ -773,6 +822,15 @@
         this._commandWindow.setHandler("continue", this.commandContinue.bind(this));
         this._commandWindow.setHandler("options",  this.commandOptions.bind(this));
         this.addWindow(this._commandWindow);
+    };
+
+    // Shared picture cache must not be destroyed when leaving the title scene.
+    const _Scene_Title_terminate = Scene_Title.prototype.terminate;
+    Scene_Title.prototype.terminate = function() {
+        if (this._gameTitleSprite && TITLE_LOGO_PICTURE) {
+            this._gameTitleSprite.bitmap = null;
+        }
+        _Scene_Title_terminate.call(this);
     };
 
     // ========================================================================

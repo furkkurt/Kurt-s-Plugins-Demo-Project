@@ -53,22 +53,25 @@
     let frameCount = 0;
     let lastLogTime = performance.now();
 
-    // FPS limiting - throttle via frame skipping
-    let lastFrameTime = 0;
+    // FPS limiting — accumulate engine deltaTime (do not use requestAnimationFrame here;
+    // rAF passes a DOM timestamp, not deltaTime, and breaks SceneManager.update).
+    let fpsAccumulator = 0;
 
     const _SceneManager_update = SceneManager.update;
     SceneManager.update = function(deltaTime) {
-        // FPS limiting
-        const fpsLimit = ConfigManager.fpsLimit || 0;
+        const fpsLimit = Number(ConfigManager.fpsLimit) || 0;
         if (fpsLimit > 0) {
-            const now = performance.now();
-            const minInterval = 1000 / fpsLimit;
-            if (now - lastFrameTime < minInterval - 1) {
-                // Skip this frame - too soon
-                requestAnimationFrame(this.update.bind(this));
+            fpsAccumulator += deltaTime;
+            const frameTime = 1 / fpsLimit;
+            if (fpsAccumulator < frameTime) {
                 return;
             }
-            lastFrameTime = now;
+            fpsAccumulator -= frameTime;
+            if (fpsAccumulator > frameTime * 4) {
+                fpsAccumulator = 0;
+            }
+        } else {
+            fpsAccumulator = 0;
         }
 
         _SceneManager_update.call(this, deltaTime);

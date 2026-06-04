@@ -2,7 +2,7 @@
 // KurtsCameraLag.js
 //=============================================================================
 /*:
- * @plugindesc v2.0.0 Adds smooth camera lag/easing when following the player
+ * @plugindesc v2.0.1 Adds smooth camera lag/easing when following the player
  * @author Furkan Kurt
  *
  * @param Lag Strength
@@ -27,8 +27,8 @@
  * @text Player Y Offset
  * @desc Vertical offset for player centering in pixels. Negative = up, Positive = down.
  * @type number
- * @min -100
- * @max 100
+ * @min -999
+ * @max 999
  * @default 0
  *
  * @help
@@ -39,6 +39,7 @@
  * Adds smooth camera lag/easing when following the player.
  * A single Camera Lag value controls both follow lag and transition lag.
  * The value can be changed at runtime via the options menu.
+ * Player Y Offset is in screen pixels (Plugin Manager allows -999 to 999).
  *
  * ============================================================================
  */

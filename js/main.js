@@ -141,8 +141,32 @@ class Main {
 
     initEffekseerRuntime() {
         const onLoad = this.onEffekseerLoad.bind(this);
-        const onError = this.onEffekseerError.bind(this);
-        effekseer.initRuntime(effekseerWasmUrl, onLoad, onError);
+        // Effekseer WASM often hangs on Wine/Proton NW.js; do not block boot forever.
+        const timeoutMs = 12000;
+        let finished = false;
+        const finish = () => {
+            if (finished) return;
+            finished = true;
+            clearTimeout(timeoutId);
+            onLoad();
+        };
+        const timeoutId = setTimeout(() => {
+            console.warn(
+                "Effekseer init timed out after " + timeoutMs + "ms (Wine/Proton). Starting without effects."
+            );
+            finish();
+        }, timeoutMs);
+        const onError = () => {
+            console.warn("Effekseer failed to load; starting without effects.");
+            finish();
+        };
+        const onSuccess = () => finish();
+        try {
+            effekseer.initRuntime(effekseerWasmUrl, onSuccess, onError);
+        } catch (e) {
+            console.warn("Effekseer init threw:", e);
+            finish();
+        }
     }
 
     onEffekseerLoad() {

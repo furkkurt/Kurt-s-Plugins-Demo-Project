@@ -1,0 +1,25 @@
+2026-06-03 21:35:05 === playtest start ===
+2026-06-03 21:35:05 project=C:\users\steamuser\Documents\RMMZ\deneme chromium-profile=default
+Proton: starting...
+ntsync: up and running.
+Failed to open /etc/machine-id, error No such file or directory.
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+Authorization required, but no authorization protocol specified
+
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 248 requests (248 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 74 requests (74 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 145 requests (145 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 142 requests (142 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 123 requests (123 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 62 requests (62 known processed) with 0 events remaining.
+XIO:  fatal IO error 110 (Connection timed out) on X server ":0"
+      after 62 requests (62 known processed) with 0 events remaining.

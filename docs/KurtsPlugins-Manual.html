@@ -1,0 +1,569 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Kurts RPG Maker MZ Eklentileri — Geliştirici Rehberi</title>
+  <style>
+    :root { --bg:#1a1d23; --fg:#e8eaed; --muted:#9aa0a6; --accent:#8ab4f8; --card:#252830; --border:#3c4043; }
+    * { box-sizing: border-box; }
+    body { font-family: system-ui, "Segoe UI", Roboto, sans-serif; background: var(--bg); color: var(--fg); line-height: 1.55; margin: 0; padding: 1.5rem 2rem 4rem; max-width: 52rem; margin-inline: auto; }
+    h1 { font-size: 1.65rem; border-bottom: 1px solid var(--border); padding-bottom: .5rem; }
+    h2 { font-size: 1.25rem; margin-top: 2rem; color: var(--accent); }
+    h3 { font-size: 1.05rem; margin-top: 1.25rem; }
+    p, li { color: var(--fg); }
+    .muted { color: var(--muted); font-size: .92rem; }
+    nav { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin: 1.5rem 0; }
+    nav ol { margin: .35rem 0 0 1.1rem; padding: 0; }
+    nav a { color: var(--accent); text-decoration: none; }
+    nav a:hover { text-decoration: underline; }
+    .card { background: var(--card); border: 1px solid var(--border); border-radius: 8px; padding: 1rem 1.25rem; margin: 1rem 0; }
+    pre, code { font-family: ui-monospace, "Cascadia Code", monospace; font-size: .84rem; }
+    pre { background: #0d1117; border: 1px solid var(--border); border-radius: 6px; padding: .85rem 1rem; overflow-x: auto; white-space: pre-wrap; word-break: break-word; }
+    code { background: #0d1117; padding: .12rem .35rem; border-radius: 4px; }
+    pre code { background: none; padding: 0; }
+    table { width: 100%; border-collapse: collapse; font-size: .9rem; margin: .75rem 0; }
+    th, td { border: 1px solid var(--border); padding: .45rem .6rem; text-align: left; }
+    th { background: var(--card); }
+    .tag { display: inline-block; background: #30343c; color: #bdc1c6; padding: .15rem .45rem; border-radius: 4px; font-size: .78rem; margin-right: .35rem; }
+    kbd { background: #30343c; padding: .1rem .4rem; border-radius: 4px; font-size: .85em; }
+  </style>
+</head>
+<body>
+
+<h1>Kurts RPG Maker MZ Eklentileri — Geliştirici Rehberi</h1>
+<p class="muted">Bu dosya, projedeki özel eklentilerin <strong>nasıl çalıştığını</strong> ve MZ’de eklenti yazmanın <strong>temel kavramlarını</strong> açıklar. TypeScript’e geçişi siz yapacağınız için burada <em>davranış ve mimari</em> özetlenir; satır satır çeviri yerine anlayış hedeflenir.</p>
+
+<nav>
+  <strong>İçindekiler</strong>
+  <ol>
+    <li><a href="#fundamentals">RPG Maker MZ eklenti temelleri</a></li>
+    <li><a href="#menu-screen">Menü ekranı — AltMenuScreen ve düzenleme</a></li>
+    <li><a href="#code-writing">Kod yazımı — örnekler ve kalıplar</a></li>
+    <li><a href="#order">Önerilen okuma / TS’e taşıma sırası</a></li>
+    <li><a href="#p-animation">1. KurtsAnimationPlugin</a></li>
+    <li><a href="#p-keymapper">2. KurtsKeyMapper</a></li>
+    <li><a href="#p-playerdefaults">3. KurtsPlayerDefaults</a></li>
+    <li><a href="#p-fps">4. KurtsFPSLogger</a></li>
+    <li><a href="#p-cameralag">5. KurtsCameraLag</a></li>
+    <li><a href="#p-zoom">6. KurtsMouseWheelZoom</a></li>
+    <li><a href="#p-foreground">7. KurtsMapForeground</a></li>
+    <li><a href="#p-shake">8. KurtsShakePlugin</a></li>
+    <li><a href="#p-interaction">9. KurtsInteractionRangePlugin</a></li>
+    <li><a href="#p-resolution">10. KurtsResolutionPictures</a></li>
+    <li><a href="#p-tooltip">11. KurtsTranslationTooltip</a></li>
+    <li><a href="#p-options">12. KurtsOptionsMenu</a></li>
+    <li><a href="#p-perspective">13. KurtsPerpectivePlugin</a></li>
+    <li><a href="#ts-notes">TypeScript’e taşırken notlar</a></li>
+  </ol>
+</nav>
+
+<h2 id="fundamentals">RPG Maker MZ eklenti temelleri</h2>
+
+<h3>Oyun nasıl çalışır (çok kısa)</h3>
+<p>MZ bir <strong>JavaScript</strong> oyunudur. Çekirdek sınıflar <code>js/rmmz_*.js</code> içindedir (ör. <code>Game_Player</code>, <code>Sprite_Character</code>, <code>Scene_Map</code>). Her karede <code>SceneManager</code> aktif sahneyi günceller; sahneler pencereleri ve spriteları günceller.</p>
+
+<h3>Eklenti dosyası nedir?</h3>
+<p>Tek bir <code>.js</code> dosyasıdır. Üstte <code>/*: ... */</code> bloğu <strong>plugin komutları</strong> için meta veridir: <code>@plugindesc</code>, <code>@param</code> vb. Editör bu metni okuyup Plugin Manager’da form oluşturur.</p>
+
+<h3><code>PluginManager.parameters('EklentiAdı')</code></h3>
+<p>Plugin Manager’daki değerler <strong>string</strong> sözlük olarak gelir. Sayı/boolean için <code>Number(...)</code>, <code>=== 'true'</code> gibi dönüşüm sizde.</p>
+
+<h3>Neden <code>(() =&gt; { 'use strict'; ... })();</code>?</h3>
+<p><strong>IIFE</strong> (anında çalışan fonksiyon): global alanı kirletmemek için. Eklenti yüklendiğinde bir kez çalışır; içindeki <code>const</code>’lar dışarı çıkmaz (MZ global’larına yine <code>window.X</code> veya prototype ile erişirsiniz).</p>
+
+<h3>Prototype “alias” kalıbı (en önemli desen)</h3>
+<p>Mevcut fonksiyonu <strong>değiştirmeden sarmalamak</strong> için önce referans saklanır, sonra aynı isimle yeni fonksiyon atanır:</p>
+<pre><code>const _Eski = SomeClass.prototype.foo;
+SomeClass.prototype.foo = function(...args) {
+  // önce / sonra ek mantık
+  return _Eski.call(this, ...args);
+};</code></pre>
+<p>Böylece çekirdek güncellense bile zincir korunur. TypeScript’te de aynı mantık: önce <code>const _orig = ...</code>, sonra atama.</p>
+
+<h3>Oyun verisi vs. ekran (mantıksal / görsel)</h3>
+<ul>
+  <li><strong>Mantık</strong>: <code>Game_CharacterBase</code>, <code>Game_Player</code>, <code>Game_Map</code> — “oyunda ne oluyor”.</li>
+  <li><strong>Görsel</strong>: <code>Sprite_Character</code>, <code>Spriteset_Map</code> — “ekranda nasıl çiziliyor”.</li>
+</ul>
+<p>Animasyon kare indeksi gibi şeyler genelde mantık tarafında (<code>_pattern</code>); kırpma dikdörtgeni çoğu zaman sprite tarafında.</p>
+
+<h3>Sık kullanılan global’lar</h3>
+<table>
+  <tr><th>İsim</th><th>Rol</th></tr>
+  <tr><td><code>SceneManager</code></td><td>Aktif sahne, sahne geçişi</td></tr>
+  <tr><td><code>Graphics</code></td><td>Çözünürlük, <code>frameCount</code>, boyutlar</td></tr>
+  <tr><td><code>Input</code></td><td>Klavye/oynatıcı; <code>keyMapper</code></td></tr>
+  <tr><td><code>ImageManager</code></td><td><code>img/characters</code>, <code>img/pictures</code> yükleme</td></tr>
+  <tr><td><code>$gamePlayer</code>, <code>$gameMap</code>, <code>$gameScreen</code></td><td>Oyun oturumu sırasında canlı nesneler</td></tr>
+  <tr><td><code>$dataMap</code>, <code>$dataSystem</code></td><td>Editörden gelen JSON veri</td></tr>
+  <tr><td><code>ConfigManager</code></td><td>Kaydedilen ayarlar (genişletilebilir)</td></tr>
+</table>
+
+<h3>Eklenti sırası (<code>plugins.js</code>)</h3>
+<p>Üstteki eklenti önce yüklenir. Bir eklenti diğerinin patch’ini tekrar sararsa sıra önemlidir. Örneğin harita ön planı zoom/lag ile uyum için belirtilen sıraya uymak gerekir.</p>
+
+<h3><code>js/plugins.js</code> ve <code>$plugins</code></h3>
+<p>Editör bu dosyayı üretir; her öğe <code>name</code>, <code>status</code>, <code>parameters</code> içerir. Oyun başlarken çekirdek eklenti listesini okur; sizin kodunuz <code>PluginManager.parameters('TamDosyaAdı')</code> ile aynı <code>name</code> anahtarını kullanmalıdır (dosya adı <code>.js</code> olmadan).</p>
+
+<h3>Sahne (Scene) ve pencere (Window)</h3>
+<ul>
+  <li><strong>Scene_*</strong>: Tam ekran durum makinesi (başlık, harita, savaş, menü). <code>create()</code> içinde pencereler oluşturulur.</li>
+  <li><strong>Window_*</strong>: Dikdörtgen içinde metin/seçenek çizer; <code>update</code> ile giriş alır.</li>
+  <li><strong>Sprite_*</strong>: Oyun dünyası veya UI görseli; PIXI tabanlı.</li>
+</ul>
+
+<h2 id="menu-screen">Menü ekranı — AltMenuScreen ve düzenleme</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/AltMenuScreen.js</code> · <span class="tag">Yazar</span> Yoji Ojima (MZ ile gelen örnek eklenti) · <span class="tag">Parametre</span> yok</p>
+<p>Bu bölüm, RPG Maker MZ’ye hiç bakan biri için menünün <em>nerede</em> tanımlandığını ve <code>AltMenuScreen</code>’in varsayılan düzeni nasıl değiştirdiğini özetler. Projede menü görünümü için ayrıca <code>KurtsOptionsMenu.js</code> (arka plan, font vb.) kullanılıyor; <code>AltMenuScreen</code> ise yalnızca <strong>pencere yerleşimi ve çizim</strong> ile ilgilidir.</p>
+
+<h3>Menü “ekranı” nedir?</h3>
+<p>Haritada menü tuşuna basınca oyun <code>Scene_Menu</code> sahnesine geçer. Sahne, birkaç <strong>pencere</strong> oluşturur:</p>
+<ul>
+  <li><strong>Komut penceresi</strong> (<code>Window_MenuCommand</code>): Eşya, Beceri, Donanım, Kaydet…</li>
+  <li><strong>Altın penceresi</strong> (<code>Window_Gold</code>): Parti parası.</li>
+  <li><strong>Durum penceresi</strong> (<code>Window_MenuStatus</code>): Grup üyelerinin yüzü, adı, can/MP çubukları.</li>
+</ul>
+<p>Pencere boyutu ve ekrandaki yeri, sahnedeki <code>*WindowRect()</code> metotlarıyla hesaplanır; pencere içinde ne çizileceği ise <code>Window_*</code> sınıfındaki <code>drawItem</code>, <code>maxCols</code> gibi metotlarla belirlenir.</p>
+
+<h3>Varsayılan düzen (eklenti kapalı)</h3>
+<p>Çekirdek kod (<code>js/rmmz_scenes.js</code>) menüyü <strong>yan yana iki sütun</strong> gibi düşünür:</p>
+<pre><code>┌──────────────┬────────────────────────────────┐
+│  Komutlar    │                                │
+│  (~240 px)   │   Grup durumu (dikey liste)    │
+│              │   4 satır, yüz solda metin sağda│
+│              │                                │
+│  [Altın]     │                                │
+└──────────────┴────────────────────────────────┘</code></pre>
+<p><code>mainCommandWidth()</code> sol şerit genişliğini <strong>240 piksel</strong> yapar. Komutlar tek sütunda uzun bir liste; durum penceresi kalan genişliği kaplar.</p>
+
+<h3>AltMenuScreen ne değiştirir?</h3>
+<p>Eklenti, “komutlar solda / durum sağda” yerine <strong>üstte komutlar, altta durum</strong> düzenine geçer; her iki pencere de ekran genişliğini (<code>Graphics.boxWidth</code>) kullanır.</p>
+<pre><code>┌──────────────────────────────────────────────┐
+│  Komutlar (4 sütun × 2 satır = 8 hücre)      │
+├──────────────────────────────────────────────┤
+│  Grup durumu (4 sütun × 1 satır = 4 kart)    │
+│  [kart][kart][kart][kart]                    │
+├──────────────────────────────────────────────┤
+│  Altın (tam genişlik, en altta)              │
+└──────────────────────────────────────────────┘</code></pre>
+<p>Özet: daha “konsol RPG” tarzı yatay komut şeridi ve parti üyeleri tek sırada.</p>
+
+<h3>Eklenti nasıl “bağlanır”? (prototype değiştirme)</h3>
+<p>Dosya bir IIFE içinde çalışır; yüklendiğinde mevcut sınıfların <strong>prototype</strong> üzerindeki fonksiyonları <em>doğrudan yeniden atar</em> (alias saklamaz — bu eklenti için yeterli, çünkü orijinal gövdeyi çağırmıyor).</p>
+<p>MZ’de sınıf adları global’dır: <code>Scene_Menu.prototype.commandWindowRect = function() { ... }</code> yazdığınız anda, bir sonraki menü açılışında motor <strong>sizin</strong> fonksiyonunuzu kullanır.</p>
+
+<h3>Adım adım: hangi fonksiyon ne işe yarar?</h3>
+
+<h4>1) <code>Scene_MenuBase</code> — yükseklik yardımcıları</h4>
+<pre><code>Scene_MenuBase.prototype.commandWindowHeight = function() {
+    return this.calcWindowHeight(2, true);  // 2 satır, seçilebilir pencere
+};
+Scene_MenuBase.prototype.goldWindowHeight = function() {
+    return this.calcWindowHeight(1, true);  // altın şeridi 1 satır
+};</code></pre>
+<p><code>calcWindowHeight(satırSayısı, seçilebilirMi)</code> çerçeve + padding dahil piksel yüksekliği verir. AltMenuScreen bu iki değeri <code>Scene_Menu</code> içinde üst üste dizmek için kullanır.</p>
+
+<h4>2) <code>Scene_Menu</code> — pencere dikdörtgenleri (<code>Rectangle</code>)</h4>
+<p>Her <code>*WindowRect()</code> dört sayı döner: <code>x, y, genişlik, yükseklik</code>.</p>
+<ul>
+  <li><strong><code>commandWindowRect</code></strong>: Üst şerit — <code>wx=0</code>, <code>wy=mainAreaTop()</code>, tam genişlik, yükseklik = komut penceresi yüksekliği.</li>
+  <li><strong><code>statusWindowRect</code></strong>: Orta bölge — komut + altın yüksekliği çıkarılarak kalan <code>mainAreaHeight()</code> kullanılır; <code>wy</code> komutların hemen altı.</li>
+</ul>
+<p><code>mainAreaTop()</code> / <code>mainAreaBottom()</code> / <code>mainAreaHeight()</code>: Dokunmatik UI’deki iptal/sayfa düğmeleri ve (varsa) yardım penceresi dışında kalan “asıl içerik” alanı (<code>Scene_MenuBase</code>).</p>
+
+<h4>3) <code>Scene_ItemBase</code> — eşya/beceri hedef seçimi</h4>
+<pre><code>Scene_ItemBase.prototype.actorWindowRect = function() {
+    const rect = Scene_Menu.prototype.statusWindowRect();
+    rect.y = this.mainAreaBottom() - rect.height;
+    return rect;
+};</code></pre>
+<p>Eşya veya beceri kullanırken “hangi aktör?” sorusu için <code>Window_MenuActor</code> açılır. Varsayılan bu pencereyi sol geniş şeritte tutar; AltMenuScreen aynı boyutu alıp <strong>ekranın altına</strong> yapıştırır — menüdeki parti kartlarıyla görsel tutarlılık için.</p>
+
+<h4>4) <code>Window_MenuCommand</code> — komut ızgarası</h4>
+<pre><code>Window_MenuCommand.prototype.maxCols = function() { return 4; };
+Window_MenuCommand.prototype.numVisibleRows = function() { return 2; };</code></pre>
+<p><code>Window_Selectable</code> (ata sınıf) listedeki her öğenin hücresini <code>maxCols</code> ve <code>numVisibleRows</code> ile böler. 4×2 = en fazla 8 komut hücresi görünür (Eşya, Beceri, Donanım, Durum, Düzen, Seçenekler, Kaydet, Oyundan çık gibi).</p>
+
+<h4>5) <code>Window_MenuStatus</code> — parti kartları ve çizim</h4>
+<p>Yine 4 sütun, 1 satır — dört aktör yan yana.</p>
+<p>Motor her aktör için <code>drawItem(index)</code> çağırır; o da sırayla:</p>
+<ol>
+  <li><code>drawPendingItemBackground</code> — düzen modunda bekleyen seçim vurgusu (çekirdek).</li>
+  <li><code>drawItemImage</code> — yüz resmi.</li>
+  <li><code>drawItemStatus</code> — isim, seviye, sınıf, göstergeler, durum ikonları.</li>
+</ol>
+<p>AltMenuScreen bu iki çizim metodunu <strong>yeniden yazar</strong>:</p>
+<ul>
+  <li><strong>Yüz:</strong> Hücrenin ortasına yakın, en fazla 144×144; savaşta olmayan üye soluk (<code>changePaintOpacity</code>).</li>
+  <li><strong>Metin:</strong> Üstte ad + seviye; altta sınıf, <code>placeBasicGauges</code> (HP/MP/TP), en altta durum ikonları. Varsayılandaki “yüz solda, metin sağda tek satır” yerine <strong>dikey kart</strong> düzeni.</li>
+</ul>
+<p>Çizim yardımcıları <code>Window_StatusBase</code> içinde tanımlıdır: <code>drawActorFace</code>, <code>drawActorName</code>, <code>drawActorLevel</code>, <code>drawActorClass</code>, <code>placeBasicGauges</code>, <code>drawActorIcons</code>.</p>
+
+<h3>Veri nereden gelir?</h3>
+<p>Eklenti veritabanı okumaz; yalnızca yerleşim ve çizim değişir.</p>
+<ul>
+  <li>Hangi menü komutlarının görüneceği: <code>$dataSystem.menuCommands</code> (editör → Sistem → Menü komutları).</li>
+  <li>Parti üyeleri: <code>$gameParty.members()</code>.</li>
+  <li>Son seçilen komut: <code>Window_MenuCommand._lastCommandSymbol</code> (menüye dönünce imleç hatırlanır).</li>
+</ul>
+
+<h3>Menü düzenlemek için sık kullanılan kancalar</h3>
+<table>
+  <tr><th>Konu</th><th>Sınıf / metot</th><th>Ne için?</th></tr>
+  <tr><td>Pencere yeri/boyutu</td><td><code>Scene_Menu.prototype.commandWindowRect</code>, <code>statusWindowRect</code>, <code>goldWindowRect</code></td><td>Tüm yerleşim buradan</td></tr>
+  <tr><td>Sol şerit genişliği (varsayılan)</td><td><code>Scene_Base.prototype.mainCommandWidth</code></td><td>240 px; AltMenuScreen bunu bypass eder</td></tr>
+  <tr><td>Yükseklik hesabı</td><td><code>Scene_Base.prototype.calcWindowHeight</code></td><td>Satır sayısı → piksel</td></tr>
+  <tr><td>Komut listesi</td><td><code>Window_MenuCommand.prototype.makeCommandList</code>, <code>addOriginalCommands</code></td><td>Eklentiler <code>addOriginalCommands</code> ile yeni menü satırı ekler</td></tr>
+  <tr><td>Komut ızgarası</td><td><code>maxCols</code>, <code>numVisibleRows</code></td><td>Hücre sayısı ve gezinme</td></tr>
+  <tr><td>Parti çizimi</td><td><code>Window_MenuStatus.prototype.drawItemImage</code>, <code>drawItemStatus</code></td><td>Kart görünümü</td></tr>
+  <tr><td>Menü açılışı</td><td><code>Scene_Menu.prototype.create</code>, <code>setHandler("item", ...)</code></td><td>Hangi komut hangi sahneye gider</td></tr>
+  <tr><td>Arka plan / bulanıklık</td><td><code>Scene_MenuBase.prototype.createBackground</code>, <code>setBackgroundOpacity</code></td><td>Projede <code>KurtsOptionsMenu</code> burayı da kullanabilir</td></tr>
+  <tr><td>Eşya hedef penceresi</td><td><code>Scene_ItemBase.prototype.actorWindowRect</code></td><td>Eşya/beceri akışı</td></tr>
+</table>
+
+<h3>Pratik tavsiyeler</h3>
+<ul>
+  <li><strong>Küçük denemeler:</strong> Önce yalnızca <code>maxCols</code> / <code>numVisibleRows</code> değiştirin; yerleşim bozulmadan komut ızgarasını görürsünüz.</li>
+  <li><strong>Çakışan eklentiler:</strong> İki eklenti aynı <code>prototype</code> metodunu atarsa <strong>plugins.js sırasında alttaki kazanır</strong>. Menü + seçenekler + çözünürlük birlikteyse sırayı test edin.</li>
+  <li><strong>Resmi kardeş eklenti:</strong> <code>AltSaveScreen.js</code> kayıt ekranı düzenini benzer mantıkla değiştirir; menüyle birlikte düşünülebilir.</li>
+  <li><strong>Yeni menü komutu:</strong> <code>Window_MenuCommand.prototype.addOriginalCommands</code> içinde <code>this.addCommand('Etiket', 'sembol', true)</code> ve <code>Scene_Menu.prototype.createCommandWindow</code> içinde <code>setHandler('sembol', ...)</code> (alias ile sarmalamak güvenli).</li>
+  <li><strong>Tamamen özel menü:</strong> Nadiren gerekir; çoğu proje için <code>Scene_Menu</code> + <code>Window_Menu*</code> yamaları yeterlidir. Ağır UI için yeni bir <code>Scene_*</code> ve <code>SceneManager.push</code> da mümkündür.</li>
+  <li><strong>Çözünürlük:</strong> <code>Graphics.boxWidth</code> / <code>boxHeight</code> o anki oyun alanıdır; UI ölçekleyen eklenti varsa (<code>KurtsResolutionPictures</code>) menü metinlerinde ayrı, dikdörtgenlerde genelde çekirdek koordinatları kullanılır — test ederek doğrulayın.</li>
+</ul>
+
+<div class="card">
+  <p><strong>Özet:</strong> <code>AltMenuScreen.js</code> menüyü yeniden programlamaz; MZ’nin <code>Scene_Menu</code> + <code>Window_MenuCommand</code> + <code>Window_MenuStatus</code> üçlüsünün “nerede duracağını” ve “nasıl çizileceğini” override eder. RPGMZ’ye yabancı biri için ana fikir: <em>sahne = pencere düzeni, pencere = liste + çizim fonksiyonları</em>.</p>
+</div>
+
+<h2 id="code-writing">Kod yazımı — örnekler ve kalıplar</h2>
+<p class="muted">Aşağıdaki parçalar projedeki eklentilerden türetilmiştir; aynı düzeni TypeScript’te de kullanırsınız (sözdizimi + türler farklı olur).</p>
+
+<h3>1) Minimal eklenti iskeleti</h3>
+<p>Dosya <strong>yüklenir yüklenmez</strong> gövde çalışır. Üstteki yorum bloğu MZ editörü içindir; <code>@plugindesc</code> ve <code>@param</code> anahtarları Plugin Manager formunu üretir. <code>PluginManager.parameters</code> içindeki isim, <strong>dosya adıyla aynı</strong> olmalıdır (<code>KurtsCameraLag.js</code> → <code>'KurtsCameraLag'</code>).</p>
+<pre><code>//=============================================================================
+// MyPlugin.js
+//=============================================================================
+/*:
+ * @plugindesc v1.0.0 Kısa açıklama
+ * @author İsim
+ *
+ * @param My Number
+ * @type number
+ * @default 10
+ *
+ * @help
+ * Oyuncu için notlar (isteğe bağlı).
+ */
+
+(() =&gt; {
+    'use strict';
+
+    const parameters = PluginManager.parameters('MyPlugin');
+    const MY_NUMBER = Number(parameters['My Number'] || 10);
+
+    // Patch veya başka kurulum burada — aşağıdaki bölümlerde örnekler
+
+})();
+</code></pre>
+<p><strong>Neden IIFE?</strong> <code>const MY_NUMBER</code> gibi değişkenler global <code>window</code>’u kirletmez; isim çakışması riski azalır. Eklenti tek seferlik kurulum içindir.</p>
+
+<h3>2) Parametre okuma: string gelir, siz dönüştürürsünüz</h3>
+<p><code>parameters['X']</code> her zaman <strong>string</strong> veya tanımsız olabilir. Sayı ve boolean için projede şu kalıplar kullanılıyor:</p>
+<pre><code>// Sayı — NaN’a karşı || ile varsayılan
+const lag = Number(parameters['Lag Strength'] || 0.15);
+
+// Boolean — Plugin Manager "true" / "false" string yollar
+const debug = parameters['Enable Debug'] === 'true';
+
+// "false değilse açık" (varsayılan açık koruması)
+const disable = parameters['Disable During Events'] !== 'false';
+</code></pre>
+
+<h3>3) Prototype “alias”: önce sakla, sonra sar</h3>
+<p>MZ çekirdeğinde zaten <code>Game_Player.prototype.initMembers</code> var. Siz <strong>tamamen değiştirmek</strong> yerine eski fonksiyonu bir değişkende saklayıp yenisinde hem ek iş yapıp hem eskiyi çağırırsınız (<code>KurtsPlayerDefaults</code> ile aynı fikir).</p>
+<pre><code>const _Game_Player_initMembers = Game_Player.prototype.initMembers;
+Game_Player.prototype.initMembers = function() {
+    _Game_Player_initMembers.call(this);   // önce motorun yaptığı her şey
+    this.setMoveSpeed(4);                   // sonra sizin ek ayarınız
+};
+</code></pre>
+<p><strong>Kritik:</strong> <code>.call(this)</code> kullanın. Böylece <code>initMembers</code> içindeki <code>this</code> yine o <code>Game_Player</code> örneğidir. <code>_Game_Player_initMembers()</code> diye parantezsiz çağırmayın — <code>this</code> kaybolur ve hata veya yanlış davranış olur.</p>
+
+<h3>4) Dönüş değeri olan patch: <code>return</code> zinciri</h3>
+<p>Bazı metotlar bir değer döner; önce orijinali çağırıp sonucu değiştirebilir veya koşullu olarak kendi değerinizi dönebilirsiniz.</p>
+<pre><code>const _Window_Base_convertEscapeCharacters = Window_Base.prototype.convertEscapeCharacters;
+Window_Base.prototype.convertEscapeCharacters = function(text) {
+    text = _Window_Base_convertEscapeCharacters.call(this, text);
+    text = text.replace(/\[hello\]/gi, 'Merhaba');
+    return text;
+};
+</code></pre>
+<p>Bu, <code>KurtsKeyMapper</code>’daki <code>[actionKey]</code> değiştirmesiyle aynı yapıdır: önce çekirdek kaçışları işlensin, sonra sizin metin ekleriniz gelsin.</p>
+
+<h3>5) Dönüş değeri olmayan patch: yan etki + orijinal</h3>
+<p><code>KurtsShakePlugin</code> gibi: önce sprite pozisyonunu motor hesaplasın, sonra sarsıntı offset’i ekleyin.</p>
+<pre><code>const _Sprite_Character_updatePosition = Sprite_Character.prototype.updatePosition;
+Sprite_Character.prototype.updatePosition = function() {
+    _Sprite_Character_updatePosition.call(this);
+    const ch = this._character;
+    if (!ch || ch._shakeDuration &lt;= 0) return;
+    this.x += Math.sin(ch._shakePhase) * ch._shakePower;
+    ch._shakePhase += ch._shakeSpeed;
+    ch._shakeDuration--;
+};
+</code></pre>
+<p>(Gerçek eklentide sadece <code>$gamePlayer</code> filtrelenir; örnek sadeleştirildi.)</p>
+
+<h3>6) Çekirdeğe <strong>yeni</strong> metot ekleme (patch değil genişletme)</h3>
+<p>Orijinali saklamadan doğrudan atayabilirsiniz — dikkat: başka eklenti aynı ismi kullanırsa çakışır. Örnek: <code>startShake</code>.</p>
+<pre><code>Game_CharacterBase.prototype.startShake = function(power, speed, duration) {
+    this._shakePower = power;
+    this._shakeSpeed = speed;
+    this._shakeDuration = duration;
+    this._shakePhase = 0;
+};
+</code></pre>
+<p>Olay komutundan <code>$gamePlayer.startShake(4, 10, 20)</code> çağrılabilir. TypeScript’te bu alanlar için tip genişletmesi (module augmentation) tanımlarsınız.</p>
+
+<h3>7) Harita / oyuncu yokken koruma (sık hata)</h3>
+<p>Oyun henüz yüklenmemişken veya başlık ekranındayken <code>$gameMap</code> null olabilir. Okumadan önce kontrol:</p>
+<pre><code>if (!$gameMap || !$gamePlayer) return;
+</code></pre>
+<p><code>KurtsMouseWheelZoom</code> içinde <code>$dataMap</code> null iken <code>displayName</code> okunmaması gibi savunmalar vardır.</p>
+
+<h3>8) Global API: dışarıdan çağrılabilir fonksiyon</h3>
+<p>Başka eklentiler veya seçenek menüsü aynı kurulumu tekrarlamak için <code>window</code>’a fonksiyon koyabilirsiniz (<code>KurtsKeyMapper_apply</code>):</p>
+<pre><code>window.MyPlugin_reapplySettings = function() {
+    // Input veya ConfigManager’ı güncelle
+};
+
+MyPlugin_reapplySettings(); // eklenti yüklenirken bir kez
+</code></pre>
+
+<h3>9) <code>ConfigManager</code> ile kalıcı ayar</h3>
+<p>Kaydet/yükle nesnesine yeni alan eklemek için <code>ConfigManager</code> yapısına (makeData / applyData) müdahale edilir; projede <code>KurtsOptionsMenu</code> + <code>KurtsFPSLogger</code> birlikte <code>fpsLimit</code>, <code>cameraLag</code> gibi alanları başlatır. Minimum örnek — sadece varsayılan:</p>
+<pre><code>if (ConfigManager.myFlag === undefined) {
+    ConfigManager.myFlag = true;
+}
+</code></pre>
+<p>Tam kalıcılık için çekirdekteki <code>ConfigManager.makeData</code> / <code>applyData</code> alias’larına aynı anahtarı eklemeniz gerekir (OptionsMenu dosyasında uzun örnek var).</p>
+
+<h3>10) Üst seviye döngü: <code>SceneManager.update</code></h3>
+<p><code>KurtsFPSLogger</code> mantığı: önce sizin koşunuz (FPS limiti), sonra mutlaka orijinal <code>update</code> çağrılsın ki oyun ilerlesin.</p>
+<pre><code>const _SceneManager_update = SceneManager.update;
+SceneManager.update = function(deltaTime) {
+    // ... isteğe bağlı: bu kareyi atla / ölç ...
+    _SceneManager_update.call(this, deltaTime);
+};
+</code></pre>
+
+<h3>11) İki eklenti aynı metodu sararsa</h3>
+<p>Yükleme sırası: <code>plugins.js</code>’te <strong>alttaki</strong> eklenti, üsttekinin sardığı fonksiyonu tekrar sarar. Zincir: <code>Alt → Üst → Çekirdek</code>. Uyumluluk için dokümantasyonda “şu eklentiden sonra yükleyin” denir.</p>
+
+<h3>12) TypeScript’e çevirirken (kısa)</h3>
+<ul>
+  <li>Aynı IIFE veya derlenmiş tek modül çıktısı + MZ’nin beklediği global isimler.</li>
+  <li><code>prototype</code> atamaları için <code>this</code> türü: ilgili sınıf (<code>this: Game_Player</code>).</li>
+  <li>Çekirdekte olmayan alanlar: <code>interface Game_CharacterBase { _shakeDuration?: number }</code> gibi augmentation.</li>
+</ul>
+
+<h3>13) Erken çıkış + çoklu koşul (örnek düşünce: <code>animationWait</code>)</h3>
+<p>Uzun override’larda okunabilirlik için: önce “bu eklenti bu nesneye uygulanmıyor” durumlarında <strong>orijinali çağır ve çık</strong>.</p>
+<pre><code>const _Game_CharacterBase_animationWait = Game_CharacterBase.prototype.animationWait;
+Game_CharacterBase.prototype.animationWait = function() {
+    let name = null;
+    try {
+        name = this.characterName ? this.characterName() : null;
+    } catch (e) { /* bazı bağlamlarda yok */ }
+
+    if (!name || !name.startsWith('$')) {
+        return _Game_CharacterBase_animationWait.call(this);
+    }
+
+    // ... JSON karakterine özel hesaplama ...
+    return Math.max(1, Math.round(15 / jsonPatSpd));
+};
+</code></pre>
+<p>Bu yapı <code>KurtsAnimationPlugin</code> ile aynı fikirdir: çoğu karakterde motor davranışı bozulmaz, sadece <code>$</code> sheet’lerde özel mantık çalışır.</p>
+
+<h2 id="order">Önerilen okuma / TypeScript’e taşıma sırası</h2>
+<p>Siz “animasyon ilk” dediniz; mantık olarak küçükten büyüğe gitmek TS öğrenimi için de iyidir:</p>
+<ol>
+  <li><strong>KurtsAnimationPlugin</strong> — karmaşık ama tek “oyun döngüsü” hikayesi (pattern + bekleme).</li>
+  <li><strong>KurtsKeyMapper</strong> — küçük, <code>Input</code> + metin kaçışı.</li>
+  <li><strong>KurtsPlayerDefaults</strong> — birkaç satır patch.</li>
+  <li><strong>KurtsFPSLogger</strong> — tek üst seviye döngü sarmalayıcısı.</li>
+  <li><strong>KurtsCameraLag</strong> — harita kaydırma.</li>
+  <li><strong>KurtsMouseWheelZoom</strong> — zoom + çözünürlük ölçeği.</li>
+  <li><strong>KurtsMapForeground</strong> — <code>Spriteset_Map</code> katmanı.</li>
+  <li><strong>KurtsShakePlugin</strong> — minik sprite offset.</li>
+  <li><strong>KurtsInteractionRangePlugin</strong> — tetik kontrolü + ikon sprite’ı.</li>
+  <li><strong>KurtsResolutionPictures</strong> — resim + mesaj penceresi matematiği.</li>
+  <li><strong>KurtsTranslationTooltip</strong> — mesaj penceresi + özel <code>Window_*</code>.</li>
+  <li><strong>KurtsOptionsMenu</strong> — en geniş: sahneler, pencereler, <code>ConfigManager</code>, özel sahneler.</li>
+  <li><strong>KurtsPerpectivePlugin</strong> — şu an projede kapalı; isteğe bağlı.</li>
+</ol>
+
+<!-- ========== ANIMATION ========== -->
+<h2 id="p-animation">1. KurtsAnimationPlugin</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsAnimationPlugin.js</code></p>
+<p><strong>Amaç:</strong> <code>img/characters/</code> altında <strong><code>$</code> ile başlayan</strong> sheet’ler için, aynı isimdeki <strong>JSON</strong> (LibreSprite dışa aktarımı) içindeki kare isimlerine göre animasyon kırpmak; her yön ve idle/walk/run için farklı kare sayısı; hızı <code>f * …</code> ifadesiyle ayarlamak; koşudan durunca kısa süre “nefes” hızı (min koşu süresi + hold + ease).</p>
+
+<h3>Neden sadece <code>$</code> karakterler?</h3>
+<p>MZ’de <code>$</code> öneki tek dosyada 3×4 grid yerine büyük sheet kullanımını ifade eder. Bu eklenti JSON tabanlı kareleri buna bağlar.</p>
+
+<h3>JSON kare isimlendirme</h3>
+<p>Her animasyon bir önek + indeks: ör. <code>idleUp0</code>, <code>idleUp1</code>, <code>walkLeft2</code>, <code>runDown0</code>… Eklenti bu isimleri gruplayıp <code>frameData.animations[animKey]</code> dizisi üretir. Eksik animasyon olursa ilk kareye düşer.</p>
+
+<h3>Temel motor kavramı: <code>pattern</code> ve <code>animationWait</code></h3>
+<p><code>rmmz_objects.js</code> içinde kabaca şu vardır:</p>
+<ul>
+  <li><code>updateAnimationCount()</code> — hareket / adım animasyonu durumuna göre sayaç artar (koşarken 1.5 gibi).</li>
+  <li><code>animationWait()</code> — “kaç sayaçta bir kare değişsin” eşiği (varsayılan hareket hızına bağlı).</li>
+  <li><code>updatePattern()</code> — eşik aşılınca <code>_pattern</code> artar (modülü genelde <code>maxPattern()</code>).</li>
+</ul>
+<p>Bu eklenti <code>maxPattern()</code> yerine <strong>JSON’daki o anki animasyon uzunluğunu</strong> kullanır; <code>pattern()</code> override ile dışarıya doğru indeks döner.</p>
+
+<h3>Hız formülü (idle / walk / run birlikte)</h3>
+<p>İfade <code>eval</code> ile sayıya çevrilir; <code>f</code> o animasyondaki kare sayısıdır. Bekleme:</p>
+<pre><code>wait = max(1, round(15 / jsonPatSpd))</code></pre>
+<p><code>jsonPatSpd</code> büyüdükçe bekleme kısalır → animasyon hızlanır. İfade 0 veya geçersizse idle için 15, hareket için motorun varsayılan <code>animationWait</code>’i kullanılır.</p>
+
+<h3>Üzerine yazılan prototype’lar (cheat sheet)</h3>
+<table>
+  <tr><th>Sınıf.metot</th><th>Rol</th></tr>
+  <tr><td><code>Game_CharacterBase.isActivelyWalking</code></td><td>Yürüme niyeti (grid arası false negatif azaltma).</td></tr>
+  <tr><td><code>Game_CharacterBase.justStoppedMoving</code></td><td>Tam durma anı (bir kare).</td></tr>
+  <tr><td><code>Sprite_Character.setCharacterBitmap</code></td><td>JSON kullanılıp kullanılmayacağını sprite’a işaretler.</td></tr>
+  <tr><td><code>Sprite_Character.updateCharacterFrame</code></td><td>JSON kare dikdörtgeni ile <code>setFrame</code>.</td></tr>
+  <tr><td><code>Game_CharacterBase.updatePattern</code></td><td>JSON animasyonu varsa mod ile pattern++; yoksa orijinal.</td></tr>
+  <tr><td><code>Game_CharacterBase.pattern</code></td><td>Geçerli indeks sınırı.</td></tr>
+  <tr><td><code>Game_CharacterBase.isOriginalPattern</code></td><td>JSON karakterde <code>false</code> → idle’da da sayaç ilerler.</td></tr>
+  <tr><td><code>Game_CharacterBase.resetPattern</code></td><td>Harita/reset durumunda state temizliği.</td></tr>
+  <tr><td><code>Game_CharacterBase.animationWait</code></td><td>Hız + post-run idle çarpanı + run süresi tüketimi.</td></tr>
+  <tr><td><code>Game_CharacterBase.update</code></td><td>Durunca idle’a zorlama + koşu süresi sayacı (kare).</td></tr>
+</table>
+
+<h3><code>getAnimationType</code> ve <code>_forceIdleUntilMoving</code></h3>
+<p>Koşu için <code>realMoveSpeed() &gt;= Run Speed Threshold</code>. Duruşta <code>justStoppedMoving</code> ile <code>_forceIdleUntilMoving</code> bayrağı gelir; tekrar <code>isMoving()</code> olana kadar animasyon tipi idle kalır (yürüme niyeti olsa bile).</p>
+
+<h3>Post-run idle (durum makinesi)</h3>
+<ul>
+  <li><strong>Min run:</strong> Ardışık <code>run</code> kareleri sayılır; <code>run → walk</code> olunca sayaç sıfırlanır (kısa koşu → yürü → idle senaryosu boost almaz).</li>
+  <li><strong>run → idle:</strong> Biriken kare ≥ <code>Post Run Min Run Seconds × 60</code> ise (veya min 0 ise) recovery başlar.</li>
+  <li><strong>Hold:</strong> Tam boost süresi.</li>
+  <li><strong>Ease:</strong> Çarpan doğrusal olarak 1’e iner.</li>
+</ul>
+
+<h3>Parametre grupları</h3>
+<ul>
+  <li>Hız ifadeleri: Idle/Walk/Run × dört yön.</li>
+  <li>Koşu eşiği, debug, hangi <code>$</code> için JSON yükleneceği, statik sheet listesi.</li>
+  <li>Post-run: boost, min saniye, hold, ease süreleri.</li>
+</ul>
+
+<h3>TypeScript notu</h3>
+<p><code>Game_CharacterBase</code> üzerinde ek alanlar için modül augmentation; <code>eval</code> yerine güvenli DSL isteğe bağlı.</p>
+
+<!-- ========== KEY MAPPER ========== -->
+<h2 id="p-keymapper">2. KurtsKeyMapper</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsKeyMapper.js</code></p>
+<p><strong>Amaç:</strong> <code>Input.keyMapper</code> içinde tuş → sanal tuş eşlemesi (<code>ok</code>, <code>up</code>…). <code>ConfigManager.actionButton</code> / <code>movementKeys</code> değişince <code>KurtsKeyMapper_apply()</code> yeniden uygulanır (Options menüsü bunu çağırır).</p>
+<p><strong>Patch:</strong> <code>Window_Base.prototype.convertEscapeCharacters</code> — mesaj metninde <code>[actionKey]</code>, <code>[movementKeys]</code> vb. oyuncuya gösterilen metni günceller.</p>
+
+<!-- ========== PLAYER DEFAULTS ========== -->
+<h2 id="p-playerdefaults">3. KurtsPlayerDefaults</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsPlayerDefaults.js</code></p>
+<p><strong>Amaç:</strong> Oyuncu oluşturulunca ve <strong>harita transferi</strong> sonrası hız, frekans, <code>through</code> ve isteğe bağlı yönü parametrelerden uygulamak.</p>
+<p><strong>Patch:</strong> <code>Game_Player.prototype.initMembers</code>, <code>Game_Player.prototype.performTransfer</code> (harita değişince şeffaflık sıfırlama + ayarların yenilenmesi).</p>
+
+<!-- ========== FPS ========== -->
+<h2 id="p-fps">4. KurtsFPSLogger</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsFPSLogger.js</code></p>
+<p><strong>Amaç:</strong> Konsola saniyede bir FPS; isteğe bağlı FPS limiti (<code>ConfigManager.fpsLimit</code>).</p>
+<p><strong>Patch:</strong> <code>SceneManager.prototype.update</code> — limit aktifken kare atlama + orijinal <code>update</code> çağrısı.</p>
+<p class="muted">Dikkat: Aşırı agresif kare atlama giriş tepkisini etkileyebilir; mevcut kod <code>requestAnimationFrame</code> ile erken dönüş kullanır.</p>
+
+<!-- ========== CAMERA ========== -->
+<h2 id="p-cameralag">5. KurtsCameraLag</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsCameraLag.js</code></p>
+<p><strong>Amaç:</strong> Harita <code>_displayX/_displayY</code> hedefini oyuncuya doğrusal interpolasyonla yaklaştırmak; düşük zoom’da merkez modu; oyuncu Y offset’i.</p>
+<ul>
+  <li><code>Game_Map.prototype.setDisplayPos</code> — sınır kelepçesini kaldırır (lag ile uç taşlarda davranış için).</li>
+  <li><code>Game_Player.prototype.updateScroll</code> — boş: motorun anında kamerayı çekmesini engeller.</li>
+  <li><code>Game_Map.prototype.updateScroll</code> — asıl lag matematiği; <code>ConfigManager.cameraLag</code> kullanır.</li>
+  <li><code>Game_Map.prototype.setup</code> — harita değişince ara değişkenleri sıfırla.</li>
+</ul>
+
+<!-- ========== ZOOM ========== -->
+<h2 id="p-zoom">6. KurtsMouseWheelZoom</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsMouseWheelZoom.js</code></p>
+<p><strong>Amaç:</strong> Haritada <code>TouchInput.wheelY</code> ile <code>$gameScreen</code> zoom hedefini değiştirmek; 1280 referans genişliğine göre min/max; yumuşak geçiş; ana harita olay yorumlayıcısı veya mesaj penceresi açıkken isteğe bağlı kilitleme; harita görünen adı <code>cutscene</code> ile başlıyorsa eklentiyi atla.</p>
+<p><strong>Patch özetleri:</strong> <code>Game_Map.prototype.update</code> (teker + hedef zoom), <code>Spriteset_Map</code> parallax oluşturma/güncelleme (zoom ile uyum), <code>Scene_Map.prototype.start</code> (giriş sıfırlama). Global fonksiyonlar: <code>setMapZoom</code>, <code>getMapZoom</code>, <code>resetMapZoom</code> (help’teki gibi).</p>
+
+<!-- ========== FOREGROUND ========== -->
+<h2 id="p-foreground">7. KurtsMapForeground</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsMapForeground.js</code></p>
+<p><strong>Amaç:</strong> Harita notundan <code>&lt;foreground:resimAdı&gt;</code> okuyup <code>Spriteset_Map</code> üst katmanına haritaya sabitlenmiş resim sprite’ları eklemek (Show Picture komutundan bağımsız).</p>
+<p><strong>Patch:</strong> <code>createUpperLayer</code>, <code>update</code>; global script fonksiyonları: opaklık / fade.</p>
+
+<!-- ========== SHAKE ========== -->
+<h2 id="p-shake">8. KurtsShakePlugin</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsShakePlugin.js</code></p>
+<p><strong>Amaç:</strong> Sadece oyuncu sprite’ına sinüsle X offset; kamera sarsılmaz.</p>
+<p>Yeni API: <code>Game_CharacterBase.prototype.startShake</code>. Patch: <code>Sprite_Character.prototype.updatePosition</code>.</p>
+
+<!-- ========== INTERACTION ========== -->
+<h2 id="p-interaction">9. KurtsInteractionRangePlugin</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsInteractionRangePlugin.js</code></p>
+<p><strong>Amaç:</strong> Olay notundan menzilli etkileşim; oyuncu yönü şartı; tek bir ikon sprite’ı ile “burada etkileşim var” göstergesi.</p>
+<p><strong>Not formatı:</strong> <code>&lt;interactionRange:URDL&gt;</code> dört rakam yukarı/sağ/aşağı/sol tile mesafesi; isteğe bağlı <code>u</code>, <code>d</code>, <code>l</code>, <code>r</code> harfleri ile yüz yönü filtresi. İkonu kapatmak için olay sayfasında <code>&lt;noInteractIcon&gt;</code>.</p>
+<p><strong>Patch:</strong> Oyuncunun tetik kontrolleri (aynı kare ve komşu kareler) önce orijinal, sonra menzil genişletme mantığı. <code>Spriteset_Map</code> alt katmanda ikon sprite’ı oluşturur/günceller.</p>
+
+<!-- ========== RESOLUTION ========== -->
+<h2 id="p-resolution">10. KurtsResolutionPictures</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsResolutionPictures.js</code></p>
+<p><strong>Amaç:</strong> Show/Move Picture koordinat ve ölçeğini referans çözünürlüğe göre düzeltmek; mesaj penceresi / name box satır yüksekliği ve padding’i ölçeklemek; <code>\PX</code> / <code>\PY</code> kaçışları.</p>
+<p><strong>Global:</strong> <code>window.KurtsResolutionUiScale()</code> — başka eklentiler için.</p>
+
+<!-- ========== TOOLTIP ========== -->
+<h2 id="p-tooltip">11. KurtsTranslationTooltip</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsTranslationTooltip.js</code></p>
+<p><strong>Amaç:</strong> Mesaj metninde özel kaçışla “yabancı” kelimeye hover ile çeviri kutusu.</p>
+<p><strong>Sınıflar:</strong> <code>Window_TranslationTooltip</code> (<code>Window_Base</code> türevi). Patch: <code>Scene_Message.createAllWindows</code>, <code>Window_Message</code> (kaçış, güncelleme, mesaj bitişi).</p>
+<p class="muted">Çözünürlük ölçeği için KurtsResolutionPictures parametrelerini veya <code>KurtsResolutionUiScale</code> kullanır.</p>
+
+<!-- ========== OPTIONS ========== -->
+<h2 id="p-options">12. KurtsOptionsMenu</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsOptionsMenu.js</code> (büyük)</p>
+<p><strong>Amaç:</strong> Başlık ve menülerde tutarlı görünüm; çözünürlük, FPS limiti, kamera lag, ses; <strong>Kontroller</strong> alt menüsü; <code>ConfigManager</code> ile kayıt; başlıkta logo resmi parametresi.</p>
+<p><strong>Başlık sahnesi:</strong> <code>Scene_Title</code> — arka plan resmi, ön planda logo veya metin, <code>Window_TitleCommand</code> dikdörtgeni ve şeffaflık.</p>
+<p><strong>Seçenekler:</strong> <code>Window_Options.makeCommandList</code> özel satırlar; kaydırıcı için <code>cameraLag</code>; çözünürlük için ayrı dropdown penceresi sınıfı; <code>Scene_Options.terminate</code> ile diske yazma.</p>
+<p><strong>Boot:</strong> <code>Scene_Boot.prototype.resizeScreen</code> — MZ’nin veritabanı çözünürlüğünü senkron yükten sonra tekrar kullanıcı çözünürlüğüne çekmek.</p>
+<p><strong>Font:</strong> <code>FontManager.load</code> + <code>Game_System.prototype.mainFontFace</code>.</p>
+<p><strong>Diğer sahneler:</strong> <code>Scene_Menu</code> arka plan; özel <code>Scene_Controls</code> (<code>Scene_MenuBase</code> türemesi) + <code>Window_ControlOptions</code> / <code>Window_ControlDropdown</code>.</p>
+<p><strong>Bağımlılıklar:</strong> Yardım metninde sıra: <code>KurtsCameraLag</code>, <code>KurtsKeyMapper</code>, <code>KurtsFPSLogger</code> sonrası. <code>KurtsKeyMapper_apply</code> ayar değişince çağrılır.</p>
+<p>TS’e en son taşınması önerilir: çok sınıf, çok sahne ve pencere.</p>
+
+<!-- ========== PERSPECTIVE ========== -->
+<h2 id="p-perspective">13. KurtsPerpectivePlugin</h2>
+<p><span class="tag">Dosya</span> <code>js/plugins/KurtsPerpectivePlugin.js</code> <span class="tag">Durum</span> projede şu an <strong>kapalı</strong></p>
+<p><strong>Amaç:</strong> Karakter Y konumuna göre <code>Sprite_Character</code> ölçeği (pseudo-3D).</p>
+<p>Patch: <code>Sprite_Character.prototype.update</code> içinde perspektif güncellemesi.</p>
+
+<h2 id="ts-notes">TypeScript’e taşırken pratik notlar</h2>
+<div class="card">
+  <ul>
+    <li><strong>Aynı davranışı koru:</strong> Önce JS’i okuyup “hangi prototype, hangi sırada” tablosunu çıkarın; TS’de birebir aynı zinciri kurun.</li>
+    <li><strong>Türler:</strong> Toplulukta <code>@types/rmmz</code> benzeri paketler aranabilir; yoksa kritik sınıflar için kendi <code>.d.ts</code> minimal tanımlarınızı yazın.</li>
+    <li><strong>eval:</strong> Animasyon hızı ifadeleri güvenlik ve derleme için ileride küçük bir ifade ağacına dönüştürülebilir.</li>
+    <li><strong>Derleme çıktısı:</strong> Tek IIFE çıktısı üretmek genelde MZ ile uyumludur; modül sistemi kullanıyorsanız tek dosyada bundle şart.</li>
+    <li><strong>Plugin meta:</strong> Üstteki <code>/*: ... */</code> bloğu MZ editörü için genelde <strong>yorum olarak aynen</strong> kalır (derleyici silmemeli).</li>
+  </ul>
+</div>
+
+<p class="muted" style="margin-top:2rem;">Son güncelleme: rehber, depodaki eklenti sürümlerine göre yazılmıştır; menü bölümü <code>AltMenuScreen.js</code> (MZ örnek eklentisi) için eklendi. Kod değiştikçe bu HTML’i el ile güncellemeniz gerekir.</p>
+
+</body>
+</html>

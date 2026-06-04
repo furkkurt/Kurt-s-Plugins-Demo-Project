@@ -2,7 +2,7 @@
 // KurtsAnimationPlugin.js
 //=============================================================================
 /*:
- * @plugindesc v1.0.3 Allows different number of frames for each character animation using JSON frame data
+ * @plugindesc v1.0.6 Allows different number of frames for each character animation using JSON frame data
  * @author Furkan Kurt
  * 
  * @param Idle Up Speed
@@ -72,7 +72,43 @@
  * @min 1
  * @max 8
  * @default 5
- * 
+ *
+ * @param Post Run Idle Speed Boost
+ * @text Post-Run Idle Speed Boost
+ * @desc After running then stopping, idle anim plays this many times faster at first, then eases to normal. 1 = feature off.
+ * @type number
+ * @decimals 2
+ * @min 1
+ * @max 10
+ * @default 1.80
+ *
+ * @param Post Run Min Run Seconds
+ * @text Post-Run Min Run (sec)
+ * @desc Minimum continuous run time before post-run idle boost applies. 0 = no minimum (any run qualifies).
+ * @type number
+ * @decimals 2
+ * @min 0
+ * @max 120
+ * @default 0.35
+ *
+ * @param Post Run Idle Hold Seconds
+ * @text Post-Run Idle Hold (sec)
+ * @desc After qualifying run→idle, hold full boost for this long before easing down. 0 = start easing immediately.
+ * @type number
+ * @decimals 2
+ * @min 0
+ * @max 30
+ * @default 0.50
+ *
+ * @param Post Run Idle Recovery Seconds
+ * @text Post-Run Idle Ease Down (sec)
+ * @desc After the hold, seconds to linearly blend idle speed from boost down to 1× normal.
+ * @type number
+ * @decimals 1
+ * @min 0.05
+ * @max 60
+ * @default 3.0
+ *
  * @param Enable Debug
  * @text Enable Debug
  * @desc Show on-screen debug overlay with animation state (anim, pattern, rect, etc.)
@@ -129,6 +165,10 @@
  * - Each animation can have a different number of frames
  * - The plugin automatically detects walking vs running based on move speed
  * - You can configure the run speed threshold in plugin parameters (default: 5)
+ * - Speed parameters (f * …): animation wait = max(1, round(15 / result)) for idle,
+ *   walk, and run. Larger values = faster; smaller values = slower than engine default.
+ * - Post-Run Idle: run→idle can boost idle speed if the run lasted at least Min Run seconds;
+ *   then Hold seconds at full boost, then Ease Down seconds back to 1×. Boost 1 = off.
  * 
  * ============================================================================
  */
@@ -141,6 +181,22 @@
     
     // Run speed threshold (move speed >= this value is considered running)
     const RUN_SPEED_THRESHOLD = Number(parameters['Run Speed Threshold']) || 5;
+
+    const POST_RUN_IDLE_BOOST = Number(parameters['Post Run Idle Speed Boost']);
+    const POST_RUN_IDLE_BOOST_CL =
+        Number.isFinite(POST_RUN_IDLE_BOOST) && POST_RUN_IDLE_BOOST > 1.0001
+            ? POST_RUN_IDLE_BOOST
+            : 1;
+    const POST_RUN_IDLE_RECOVERY_SEC = Math.max(
+        0.05,
+        Number(parameters['Post Run Idle Recovery Seconds']) || 3
+    );
+    const _prmMinRun = Number(parameters['Post Run Min Run Seconds']);
+    const POST_RUN_MIN_RUN_SEC_CL =
+        Number.isFinite(_prmMinRun) && _prmMinRun >= 0 ? _prmMinRun : 0;
+    const _prmHold = Number(parameters['Post Run Idle Hold Seconds']);
+    const POST_RUN_HOLD_SEC_CL =
+        Number.isFinite(_prmHold) && _prmHold >= 0 ? _prmHold : 0;
     
     // Speed modifiers for each animation type and direction
     const SPEED_MODIFIERS = {
@@ -505,6 +561,19 @@
                     const pat = character._pattern;
                     const div = ensureDebugDiv();
                     if (div) {
+                        const prStart = character._jsonPostRunIdleStartFrame;
+                        const prH = character._jsonPostRunHoldFrames || 0;
+                        const prE = character._jsonPostRunEaseFrames || 0;
+                        let prLine = 'postRun: off';
+                        if (
+                            POST_RUN_IDLE_BOOST_CL > 1.0001 &&
+                            prStart != null &&
+                            prH + prE > 0
+                        ) {
+                            const el = Graphics.frameCount - prStart;
+                            const tot = prH + prE;
+                            prLine = `postRun: ${el}/${tot}f (hold ${prH}, ease ${prE})`;
+                        }
                         div.textContent =
                             `anim: ${animKey}\n` +
                             `pattern: ${pat} / ${totalFrames}\n` +
@@ -512,6 +581,7 @@
                             `isMoving: ${character.isMoving()}\n` +
                             `stopCount: ${character._stopCount}\n` +
                             `forceIdle: ${!!character._forceIdleUntilMoving}\n` +
+                            `${prLine}\n` +
                             `animWait: ${character.animationWait()}  jsonPatSpd: ${character._jsonPatSpd}`;
                     }
                 }
@@ -699,6 +769,12 @@
                 // Reset to first frame (pattern 0)
                 this._pattern = 0;
                 this._lastJsonAnimKey = null; // Reset animation tracking
+                this._jsonPostRunPrevAnimType = null;
+                this._jsonPostRunIdleStartFrame = null;
+                this._jsonPostRunHoldFrames = 0;
+                this._jsonPostRunEaseFrames = 0;
+                this._jsonRunSegmentFrames = 0;
+                this._jsonRunDurPrevType = null;
                 return;
             }
         }
@@ -708,8 +784,9 @@
     };
 
     /**
-     * Override Game_CharacterBase.animationWait to apply speed modifiers
-     * Following GALV's approach: subtract speed modifier from default wait time
+     * Override Game_CharacterBase.animationWait to apply speed modifiers.
+     * Idle, walk, and run use the same formula: wait = max(1, round(15 / jsonPatSpd))
+     * so small multipliers can slow below the engine default wait.
      */
     const _Game_CharacterBase_animationWait = Game_CharacterBase.prototype.animationWait;
     Game_CharacterBase.prototype.animationWait = function() {
@@ -738,13 +815,70 @@
                 jsonPatSpd = eval(modifier);
             } catch (e) {}
         }
-        if (animType === 'idle') {
-            if (jsonPatSpd > 0) {
-                return Math.max(1, Math.round(15 / jsonPatSpd));
+
+        const prevAnim = this._jsonPostRunPrevAnimType;
+        if (prevAnim === 'run' && animType === 'idle') {
+            const segFrames = this._jsonRunSegmentFrames || 0;
+            this._jsonRunSegmentFrames = 0;
+            if (POST_RUN_IDLE_BOOST_CL > 1.0001) {
+                const minFrames =
+                    POST_RUN_MIN_RUN_SEC_CL > 0
+                        ? Math.round(POST_RUN_MIN_RUN_SEC_CL * 60)
+                        : 0;
+                const minOk = minFrames === 0 || segFrames >= minFrames;
+                if (minOk) {
+                    this._jsonPostRunIdleStartFrame = Graphics.frameCount;
+                    this._jsonPostRunHoldFrames = Math.round(POST_RUN_HOLD_SEC_CL * 60);
+                    this._jsonPostRunEaseFrames = Math.max(
+                        1,
+                        Math.round(POST_RUN_IDLE_RECOVERY_SEC * 60)
+                    );
+                }
             }
+        }
+        if (animType !== 'idle') {
+            this._jsonPostRunIdleStartFrame = null;
+            this._jsonPostRunHoldFrames = 0;
+            this._jsonPostRunEaseFrames = 0;
+        }
+        if (
+            animType === 'idle' &&
+            jsonPatSpd > 0 &&
+            POST_RUN_IDLE_BOOST_CL > 1.0001
+        ) {
+            const start = this._jsonPostRunIdleStartFrame;
+            const holdF = this._jsonPostRunHoldFrames || 0;
+            const easeF = this._jsonPostRunEaseFrames || 0;
+            if (start != null && holdF + easeF > 0) {
+                const elapsed = Graphics.frameCount - start;
+                const total = holdF + easeF;
+                if (elapsed < total) {
+                    let mult = 1;
+                    if (elapsed < holdF) {
+                        mult = POST_RUN_IDLE_BOOST_CL;
+                    } else {
+                        const t = (elapsed - holdF) / easeF;
+                        mult =
+                            POST_RUN_IDLE_BOOST_CL +
+                            (1 - POST_RUN_IDLE_BOOST_CL) * t;
+                    }
+                    jsonPatSpd *= mult;
+                } else {
+                    this._jsonPostRunIdleStartFrame = null;
+                    this._jsonPostRunHoldFrames = 0;
+                    this._jsonPostRunEaseFrames = 0;
+                }
+            }
+        }
+        this._jsonPostRunPrevAnimType = animType;
+
+        if (jsonPatSpd > 0) {
+            return Math.max(1, Math.round(15 / jsonPatSpd));
+        }
+        if (animType === 'idle') {
             return 15;
         }
-        return Math.max(1, _Game_CharacterBase_animationWait.call(this) - jsonPatSpd);
+        return _Game_CharacterBase_animationWait.call(this);
     };
 
     /**
@@ -790,6 +924,15 @@
                         this._jsonPatSpd = 0;
                     }
                 }
+
+                // Contiguous run length (frames @ 60Hz) for post-run min gate (animationWait reads on run→idle)
+                const curAnim = getAnimationType(this);
+                if (curAnim === 'run') {
+                    this._jsonRunSegmentFrames = (this._jsonRunSegmentFrames || 0) + 1;
+                } else if (this._jsonRunDurPrevType === 'run' && curAnim === 'walk') {
+                    this._jsonRunSegmentFrames = 0;
+                }
+                this._jsonRunDurPrevType = curAnim;
             }
         }
     };
